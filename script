@@ -1,6 +1,6 @@
 loadstring([[
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 4.4 (JSON CONFIGURATION MATRIX)
+-- PREMIUM UI ENGINE - VERSION 4.5 (ADVANCED GAMEPLAY MATRIX)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -28,8 +28,14 @@ local Config = {
     TweenSpeed = 38,           
     CombatDashSpeed = 155,    
     
-    -- MISC OPTIMIZATION CONSTANTS
-    AutoRemoveOtherGardens = false
+    -- MISC OPTIMIZATION & ADVANCED CONTROLS
+    AutoRemoveOtherGardens = false,
+    FullBright = false,
+    InfiniteZoom = false,
+    AntiFling = false,
+    LessKnockback = false,
+    InstantPrompt = false,
+    BypassGameplayPaused = false
 }
 
 -- Registry to track UI toggle elements for dynamic visual updates
@@ -43,9 +49,15 @@ local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager") 
 local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
+local GuiService = game:GetService("GuiService")
 local LocalPlayer = Players.LocalPlayer
 
 local FILE_NAME = "PetHunter_PremiumConfig.json"
+local OriginalLightingSettings = {
+    Ambient = Lighting.Ambient,
+    ColorShift_Top = Lighting.ColorShift_Top,
+    Brightness = Lighting.Brightness
+}
 
 local function smoothFlyTo(targetCFrame, speedOverride)
     local character = LocalPlayer.Character
@@ -170,7 +182,6 @@ local function loadConfig()
         end)
         
         if decodeSuccess and type(decodedTable) == "table" then
-            -- Safely migrate values into original config matrix pointers
             for key, value in pairs(decodedTable) do
                 if type(value) == "table" and type(Config[key]) == "table" then
                     for subKey, subValue in pairs(value) do
@@ -181,10 +192,16 @@ local function loadConfig()
                 end
             end
             
-            -- Push data updates back up to structural visual layers
-            if ToggleRegistry["PetHuntEnabled"] then ToggleRegistry["PetHuntEnabled"](Config.PetHuntEnabled) end
-            if ToggleRegistry["ProtectionEnabled"] then ToggleRegistry["ProtectionEnabled"](Config.ProtectionEnabled) end
-            if ToggleRegistry["AutoRemoveOtherGardens"] then ToggleRegistry["AutoRemoveOtherGardens"](Config.AutoRemoveOtherGardens) end
+            -- Dynamic registration reload handlers
+            local simpleToggles = {
+                "PetHuntEnabled", "ProtectionEnabled", "AutoRemoveOtherGardens",
+                "FullBright", "InfiniteZoom", "AntiFling", "LessKnockback", 
+                "InstantPrompt", "BypassGameplayPaused"
+            }
+            
+            for _, key in ipairs(simpleToggles) do
+                if ToggleRegistry[key] then ToggleRegistry[key](Config[key]) end
+            end
             
             for petName, isTargeted in pairs(Config.TargetPets) do
                 if ToggleRegistry["Pet_" .. petName] then
@@ -230,7 +247,6 @@ local function removeOtherGardensInstantly()
     end
 end
 
--- FIXED & SAFELOCK-WRAPPED: Aggressive Texture Smoothing Engine
 local function applyAggressiveLagReduction()
     pcall(function()
         Lighting.GlobalShadows = false
@@ -286,6 +302,118 @@ local function applyAggressiveLagReduction()
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
     end)
 end
+
+-- ---------------------------------------------------------------------
+-- CORE GAMEPLAY UTILITIES RUNTIME ENVIRONMENT (BACKGROUND LOOPS)
+-- ---------------------------------------------------------------------
+
+-- FullBright & Dynamic Ambient Engine Thread
+task.spawn(function()
+    while task.wait(1) do
+        if Config.FullBright then
+            pcall(function()
+                Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+                Lighting.ColorShift_Top = Color3.fromRGB(255, 255, 255)
+                Lighting.Brightness = 2
+            end)
+        end
+    end
+end)
+
+-- Infinite Camera Tracking Zoom Engine Thread
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(function()
+            if LocalPlayer then
+                LocalPlayer.CameraMaxZoomDistance = Config.InfiniteZoom and 9e9 or 400
+            end
+        end)
+    end
+end)
+
+-- Velocity Neutralizer Anti-Fling Engine Thread
+task.spawn(function()
+    while task.wait(0.1) do
+        if Config.AntiFling then
+            pcall(function()
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= LocalPlayer and player.Character then
+                        for _, part in ipairs(player.Character:GetChildren()) do
+                            if part:IsA("BasePart") then
+                                part.CanCollide = false
+                                part.Velocity = Vector3.zero
+                                part.RotVelocity = Vector3.zero
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Knockback Vector Dampener Engine Thread
+task.spawn(function()
+    while task.wait(0.05) do
+        if Config.LessKnockback and LocalPlayer.Character then
+            pcall(function()
+                for _, child in ipairs(LocalPlayer.Character:GetDescendants()) do
+                    if child:IsA("BodyVelocity") or child:IsA("LinearVelocity") or child:IsA("BodyForce") then
+                        child:Destroy()
+                    end
+                end
+                local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if root and root.Velocity.Magnitude > 65 then
+                    root.Velocity = root.Velocity.Unit * 15
+                end
+            end)
+        end
+    end
+end)
+
+-- Proximity prompt optimization thread
+task.spawn(function()
+    while task.wait(0.5) do
+        if Config.InstantPrompt then
+            pcall(function()
+                for _, prompt in ipairs(workspace:GetDescendants()) do
+                    if prompt:IsA("ProximityPrompt") then
+                        prompt.HoldDuration = 0
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+workspace.DescendantAdded:Connect(function(descendant)
+    if Config.InstantPrompt and descendant:IsA("ProximityPrompt") then
+        pcall(function() descendant.HoldDuration = 0 end)
+    end
+end)
+
+-- Background Streaming Pause Interceptor Engine Thread
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(function()
+            GuiService:SetGameplayPausedNotificationEnabled(not Config.BypassGameplayPaused)
+            
+            if Config.BypassGameplayPaused then
+                local pGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+                if pGui then
+                    for _, node in ipairs(pGui:GetDescendants()) do
+                        if node:IsA("TextLabel") and (string.find(node.Text:lower(), "gameplay paused") or string.find(node.Text:lower(), "pausing")) then
+                            local rootWindow = node.Parent
+                            if rootWindow and rootWindow:IsA("Frame") then
+                                rootWindow.Visible = false
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
 
 -- Background Autoclicker Safeguard Thread
 task.spawn(function()
@@ -453,7 +581,6 @@ function BaseLayout.new()
     self.ViewContainer.BackgroundTransparency = 1
     self.ViewContainer.Parent = self.MainWindow
 
-    -- Minimize Action Controls
     local MinimizeBtn = Instance.new("TextButton")
     MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
     MinimizeBtn.Position = UDim2.new(1, -34, 0, 8)
@@ -649,6 +776,23 @@ function ViewCreator.SetupCanvas(titleName, viewContainer)
     return ViewFrame, Scroll
 end
 
+function ViewCreator.AddSectionHeader(scrollTarget, text)
+    local SectionFrame = Instance.new("Frame")
+    SectionFrame.Size = UDim2.new(1, -8, 0, 24)
+    SectionFrame.BackgroundTransparency = 1
+    SectionFrame.Parent = scrollTarget
+    
+    local HeaderLabel = Instance.new("TextLabel")
+    HeaderLabel.Size = UDim2.new(1, 0, 1, 0)
+    HeaderLabel.BackgroundTransparency = 1
+    HeaderLabel.Text = "- [ " .. text .. " ] -"
+    HeaderLabel.TextColor3 = Color3.fromRGB(180, 75, 75)
+    HeaderLabel.TextSize = 12
+    HeaderLabel.Font = Enum.Font.GothamBold
+    HeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
+    HeaderLabel.Parent = SectionFrame
+end
+
 function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickEvent, registryKey)
     local Card = Instance.new("Frame")
     Card.Size = UDim2.new(1, -8, 0, 42)
@@ -661,7 +805,7 @@ function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickE
     CardCorner.Parent = Card
     
     local CardTitle = Instance.new("TextLabel")
-    CardTitle.Size = UDim2.new(0.6, 0, 1, 0)
+    CardTitle.Size = UDim2.new(0.7, 0, 1, 0)
     CardTitle.Position = UDim2.new(0, 12, 0, 0)
     CardTitle.BackgroundTransparency = 1
     CardTitle.Text = labelText
@@ -810,8 +954,10 @@ for _, petData in ipairs(Database) do
 end
 
 -- ---------------------------------------------------------------------
--- TAB 2: MISCELLANEOUS ENGINE OPTIMIZATION
+-- TAB 2: MISCELLANEOUS GAMEPLAY & PERFORMANCE ENGINE OPTIONS
 -- ---------------------------------------------------------------------
+ViewCreator.AddSectionHeader(MiscScroll, "Map Controls")
+
 ViewCreator.AddActionCard(MiscScroll, "Remove Other Gardens", "Clean", function()
     removeOtherGardensInstantly()
     print("[OPTIMIZATION]: Executed instant targeted memory purge.")
@@ -826,6 +972,49 @@ ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", f
     applyAggressiveLagReduction()
     print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
 end)
+
+-- INTEGRATED NEW UTILITIES MODULE
+ViewCreator.AddSectionHeader(MiscScroll, "Environment")
+
+ViewCreator.AddToggleCard(MiscScroll, "Full Bright", Config.FullBright, function(bool)
+    Config.FullBright = bool
+    if not bool then
+        pcall(function()
+            Lighting.Ambient = OriginalLightingSettings.Ambient
+            Lighting.ColorShift_Top = OriginalLightingSettings.ColorShift_Top
+            Lighting.Brightness = OriginalLightingSettings.Brightness
+        end)
+    end
+end, "FullBright")
+
+ViewCreator.AddToggleCard(MiscScroll, "Infinite Zoom Out", Config.InfiniteZoom, function(bool)
+    Config.InfiniteZoom = bool
+end, "InfiniteZoom")
+
+ViewCreator.AddSectionHeader(MiscScroll, "Fling")
+
+ViewCreator.AddToggleCard(MiscScroll, "Anti-Fling", Config.AntiFling, function(bool)
+    Config.AntiFling = bool
+end, "AntiFling")
+
+ViewCreator.AddSectionHeader(MiscScroll, "Knockback")
+
+ViewCreator.AddToggleCard(MiscScroll, "Less knockback", Config.LessKnockback, function(bool)
+    Config.LessKnockback = bool
+end, "LessKnockback")
+
+ViewCreator.AddSectionHeader(MiscScroll, "Prompt")
+
+ViewCreator.AddToggleCard(MiscScroll, "Instant Interact Prompt", Config.InstantPrompt, function(bool)
+    Config.InstantPrompt = bool
+end, "InstantPrompt")
+
+ViewCreator.AddSectionHeader(MiscScroll, "Gameplay Paused")
+
+ViewCreator.AddToggleCard(MiscScroll, "Bypass Gameplay Paused", Config.BypassGameplayPaused, function(bool)
+    Config.BypassGameplayPaused = bool
+end, "BypassGameplayPaused")
+
 
 -- ---------------------------------------------------------------------
 -- TAB 3: CONFIG MANAGE SYSTEM (JSON DRIVEN)
@@ -846,5 +1035,5 @@ Nav:RegisterTab("Configs", "💾", ConfigView)
 -- Automated Workspace State Setup: Auto Load JSON Configuration File
 pcall(loadConfig)
 
-print("[SYSTEM]: Layout Engine Version 4.4 fully loaded. Persistent file system hooks online.")
+print("[SYSTEM]: Layout Engine Version 4.5 fully loaded. Expanded environment vectors active.")
 ]])()
