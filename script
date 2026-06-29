@@ -1,5 +1,5 @@
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 3.9 (DYNAMIC VELOCITY & MINIMIZE INTERFACE)
+-- PREMIUM UI ENGINE - VERSION 4.0 (INTEGRATED OPTIMIZATION MATRIX)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -25,7 +25,12 @@ local Config = {
     },
     FlyHeight = 2.2,
     TweenSpeed = 38,          -- OPTIMIZED: Safe speed to stop anti-cheat rubber-banding
-    CombatDashSpeed = 155     -- TACTICAL: Hyper-speed triggered ONLY when intercepting thieves
+    CombatDashSpeed = 155,    -- TACTICAL: Hyper-speed triggered ONLY when intercepting thieves
+    
+    -- MISC OPTIMIZATION CONSTANTS
+    AutoRemoveOtherGardens = false,
+    BlackScreenEnabled = false,
+    WhiteScreenEnabled = false
 }
 
 -- ---------------------------------------------------------------------
@@ -34,6 +39,7 @@ local Config = {
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager") 
+local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 
 local function smoothFlyTo(targetCFrame, speedOverride)
@@ -138,6 +144,43 @@ local function deployPurchaseInterception(activeTarget, rootPart)
     end
 end
 
+-- ---------------------------------------------------------------------
+-- PERFORMANCE OPTIMIZATION UTILITIES (MISC MODULE)
+-- ---------------------------------------------------------------------
+local function removeOtherGardensInstantly()
+    local gardensFolder = workspace:FindFirstChild("Gardens")
+    if gardensFolder then
+        for _, garden in ipairs(gardensFolder:GetChildren()) do
+            -- Client-side deletion targeting only foreign instances to maximize rendering bandwidth
+            if garden.Name ~= LocalPlayer.Name and not string.find(garden.Name, tostring(LocalPlayer.UserId)) then
+                garden:Destroy()
+            end
+        end
+    end
+end
+
+local function applyAggressiveLagReduction()
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 9e9
+    settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalThrottle.Enabled
+    
+    local terrain = workspace:FindFirstChildOfClass("Terrain")
+    if terrain then
+        terrain.WaterWaveSize = 0
+        terrain.WaterWaveSpeed = 0
+        terrain.WaterReflectance = 0
+        terrain.WaterDetail = Enum.WaterDetail.Low
+    end
+    
+    for _, instance in ipairs(workspace:GetDescendants()) do
+        if instance:IsA("ParticleEmitter") or instance:IsA("Smoke") or instance:IsA("Sparkles") then
+            instance.Enabled = false
+        elseif instance:IsA("Decal") or instance:IsA("Texture") then
+            instance:Destroy()
+        end
+    end
+end
+
 -- Background Autoclicker Safeguard Thread
 task.spawn(function()
     while task.wait(0.02) do 
@@ -166,11 +209,18 @@ task.spawn(function()
     end
 end)
 
--- Dedicated Background Worker Thread
+-- Dedicated Background Worker & Garbage Collection Thread
 task.spawn(function()
     local lastPromptCheck = 0
+    local lastGardenClean = 0
     
     while task.wait(0.1) do
+        -- Dynamic Garbage Collector Loop
+        if Config.AutoRemoveOtherGardens and (os.clock() - lastGardenClean > 1.5) then
+            lastGardenClean = os.clock()
+            removeOtherGardensInstantly()
+        end
+        
         if Config.PetHuntEnabled then
             local character = LocalPlayer.Character
             local rootPart = character and character:FindFirstChild("HumanoidRootPart")
@@ -204,7 +254,6 @@ task.spawn(function()
                         task.wait(0.1) 
                     end
                     
-                    -- Smooth flight down to target destination using safe speed matrix
                     smoothFlyTo(petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0), Config.TweenSpeed)
                     
                     while Config.PetHuntEnabled and activeTarget and activeTarget:IsDescendantOf(wildFolder) and petRoot do
@@ -299,6 +348,15 @@ function BaseLayout.new()
     self.ViewContainer.BackgroundTransparency = 1
     self.ViewContainer.Parent = self.MainWindow
 
+    -- Overlay Engine Blocks (White/Black Screens)
+    self.VisualOverlay = Instance.new("Frame")
+    self.VisualOverlay.Size = UDim2.new(1, 0, 1, 0)
+    self.VisualOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    self.VisualOverlay.BorderSizePixel = 0
+    self.VisualOverlay.ZIndex = 99999
+    self.VisualOverlay.Visible = false
+    self.VisualOverlay.Parent = self.ScreenGui
+
     -- Minimize Action Controls
     local MinimizeBtn = Instance.new("TextButton")
     MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
@@ -316,13 +374,14 @@ function BaseLayout.new()
 
     local RestoreBtn = Instance.new("TextButton")
     RestoreBtn.Size = UDim2.new(0, 85, 0, 30)
-    RestoreBtn.Position = UDim2.new(0, 15, 0, 15) -- Left side layout placement
+    RestoreBtn.Position = UDim2.new(0, 15, 0, 15)
     RestoreBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 26)
     RestoreBtn.Text = "Open UI"
     RestoreBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     RestoreBtn.Font = Enum.Font.GothamMedium
     RestoreBtn.TextSize = 12
     RestoreBtn.Visible = false
+    RestoreBtn.ZIndex = 100000 -- Ensure visibility over dark overlays
     RestoreBtn.Parent = self.ScreenGui
 
     local RestoreCorner = Instance.new("UICorner")
@@ -397,14 +456,14 @@ function Sidebar.new(sidebarFrame)
     return self
 end
 
-function Sidebar:RegisterTab(tabName, associatedViewFrame)
+function Sidebar:RegisterTab(tabName, iconText, associatedViewFrame)
     local order = #self.Buttons + 1
     self.Tabs[tabName] = associatedViewFrame
     
     local Btn = Instance.new("TextButton")
     Btn.Size = UDim2.new(1, 0, 0, 34)
     Btn.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
-    Btn.Text = "      " .. tabName
+    Btn.Text = "   " .. iconText .. "  " .. tabName
     Btn.TextColor3 = Color3.fromRGB(160, 160, 165)
     Btn.Font = Enum.Font.GothamMedium
     Btn.TextSize = 12
@@ -419,7 +478,7 @@ function Sidebar:RegisterTab(tabName, associatedViewFrame)
     local ActiveStrip = Instance.new("Frame")
     ActiveStrip.Name = "ActiveStrip"
     ActiveStrip.Size = UDim2.new(0, 3, 0, 16)
-    ActiveStrip.Position = UDim2.new(0, 8, 0.5, -8)
+    ActiveStrip.Position = UDim2.new(0, 6, 0.5, -8)
     ActiveStrip.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     ActiveStrip.BorderSizePixel = 0
     ActiveStrip.Visible = false
@@ -560,15 +619,58 @@ function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickE
     end)
 end
 
+function ViewCreator.AddActionCard(scrollTarget, labelText, buttonText, onClickEvent)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, -8, 0, 42)
+    Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+    Card.BorderSizePixel = 0
+    Card.Parent = scrollTarget
+    
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 8)
+    CardCorner.Parent = Card
+    
+    local CardTitle = Instance.new("TextLabel")
+    CardTitle.Size = UDim2.new(0.6, 0, 1, 0)
+    CardTitle.Position = UDim2.new(0, 12, 0, 0)
+    CardTitle.BackgroundTransparency = 1
+    CardTitle.Text = labelText
+    CardTitle.TextColor3 = Color3.fromRGB(230, 230, 235)
+    CardTitle.TextSize = 13
+    CardTitle.Font = Enum.Font.GothamMedium
+    CardTitle.TextXAlignment = Enum.TextXAlignment.Left
+    CardTitle.Parent = Card
+    
+    local ActionBtn = Instance.new("TextButton")
+    ActionBtn.Size = UDim2.new(0, 70, 0, 24)
+    ActionBtn.Position = UDim2.new(1, -82, 0.5, -12)
+    ActionBtn.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
+    ActionBtn.Text = buttonText
+    ActionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ActionBtn.Font = Enum.Font.GothamBold
+    ActionBtn.TextSize = 10
+    ActionBtn.Parent = Card
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+    BtnCorner.Parent = ActionBtn
+    
+    ActionBtn.MouseButton1Click:Connect(onClickEvent)
+end
+
 -- ---------------------------------------------------------------------
 -- RUNTIME DEPLOYMENT ENGINE
 -- ---------------------------------------------------------------------
 local App = BaseLayout.new()
 local Nav = Sidebar.new(App.Sidebar)
 
+-- Build Core Tabs Canvas Arrays
 local HuntView, HuntScroll = ViewCreator.SetupCanvas("Pet Interception System", App.ViewContainer)
+local MiscView, MiscScroll = ViewCreator.SetupCanvas("More FPS & Optimization", App.ViewContainer)
 
--- Master Controls Matrix
+-- ---------------------------------------------------------------------
+-- TAB 1: PET HUNTER ENGINE CONFIGURATION
+-- ---------------------------------------------------------------------
 ViewCreator.AddToggleCard(HuntScroll, "⭐ ENABLE AUTO PET HUNT", Config.PetHuntEnabled, function(bool)
     Config.PetHuntEnabled = bool
 end)
@@ -577,7 +679,6 @@ ViewCreator.AddToggleCard(HuntScroll, "🛡️ PET PURCHASE PROTECTION", Config.
     Config.ProtectionEnabled = bool
 end)
 
--- Full Target Database Compilation
 local Database = {
     {"Frog", "Common ($10K)"},
     {"Bunny", "Common ($20K)"},
@@ -599,7 +700,6 @@ for _, petData in ipairs(Database) do
     local displayName = petData[1]
     local configKey = petData[2]
     local details = petData[3] or petData[2]
-    
     if not petData[3] then configKey = displayName end
     
     ViewCreator.AddToggleCard(HuntScroll, "Target: " .. displayName .. " [" .. details .. "]", Config.TargetPets[configKey], function(bool)
@@ -607,5 +707,48 @@ for _, petData in ipairs(Database) do
     end)
 end
 
-Nav:RegisterTab("Pet Hunter", HuntView)
-print("[SYSTEM]: Layout Engine Version 3.9 successfully deployed.")
+-- ---------------------------------------------------------------------
+-- TAB 2: MISCELLANEOUS ENGINE OPTIMIZATION (MATCHING VISUAL SCHEMATICS)
+-- ---------------------------------------------------------------------
+ViewCreator.AddActionCard(MiscScroll, "Remove Other Gardens", "Clean", function()
+    removeOtherGardensInstantly()
+    print("[OPTIMIZATION]: Executed instant baseline memory purge.")
+end)
+
+ViewCreator.AddToggleCard(MiscScroll, "Auto Remove Other Gardens (Loop)", Config.AutoRemoveOtherGardens, function(bool)
+    Config.AutoRemoveOtherGardens = bool
+    if bool then removeOtherGardensInstantly() end
+end)
+
+ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", function()
+    applyAggressiveLagReduction()
+    print("[OPTIMIZATION]: 3D Lighting and complex client assets optimized.")
+end)
+
+ViewCreator.AddToggleCard(MiscScroll, "Show Screen White", Config.WhiteScreenEnabled, function(bool)
+    Config.WhiteScreenEnabled = bool
+    if bool then
+        Config.BlackScreenEnabled = false
+        App.VisualOverlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        App.VisualOverlay.Visible = true
+    else
+        if not Config.BlackScreenEnabled then App.VisualOverlay.Visible = false end
+    end
+end)
+
+ViewCreator.AddToggleCard(MiscScroll, "Show Screen Black (CPU Saver)", Config.BlackScreenEnabled, function(bool)
+    Config.BlackScreenEnabled = bool
+    if bool then
+        Config.WhiteScreenEnabled = false
+        App.VisualOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        App.VisualOverlay.Visible = true
+    else
+        if not Config.WhiteScreenEnabled then App.VisualOverlay.Visible = false end
+    end
+end)
+
+-- Register Sidebar Matrix Components
+Nav:RegisterTab("Pet Hunter", "🐾", HuntView)
+Nav:RegisterTab("Misc", "⚙️", MiscView)
+
+print("[SYSTEM]: Layout Engine Version 4.0 fully loaded. Optimization subroutines initialized.")
