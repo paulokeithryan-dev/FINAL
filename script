@@ -1,6 +1,6 @@
 loadstring([[
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 4.3 (BULLETPROOF OPTIMIZATION)
+-- PREMIUM UI ENGINE - VERSION 4.4 (JSON CONFIGURATION MATRIX)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -32,6 +32,9 @@ local Config = {
     AutoRemoveOtherGardens = false
 }
 
+-- Registry to track UI toggle elements for dynamic visual updates
+local ToggleRegistry = {}
+
 -- ---------------------------------------------------------------------
 -- SERVICE HOOKS & BACKGROUND AUTO-TRACKING ENGINE
 -- ---------------------------------------------------------------------
@@ -39,7 +42,10 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager") 
 local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
+
+local FILE_NAME = "PetHunter_PremiumConfig.json"
 
 local function smoothFlyTo(targetCFrame, speedOverride)
     local character = LocalPlayer.Character
@@ -140,8 +146,56 @@ local function deployPurchaseInterception(activeTarget, rootPart)
 end
 
 -- ---------------------------------------------------------------------
--- PERFORMANCE OPTIMIZATION UTILITIES (MISC MODULE)
+-- PERFORMANCE OPTIMIZATION UTILITIES & JSON PERSISTENCE
 -- ---------------------------------------------------------------------
+
+local function saveConfig()
+    local success, encoded = pcall(function()
+        return HttpService:JSONEncode(Config)
+    end)
+    
+    if success and writefile then
+        writefile(FILE_NAME, encoded)
+        print("[CONFIG]: Data safely written to local storage matrix.")
+    else
+        warn("[CONFIG]: Local execution hardware blocked data serialization write sequence.")
+    end
+end
+
+local function loadConfig()
+    if isfile and isfile(FILE_NAME) and readfile then
+        local fileContents = readfile(FILE_NAME)
+        local decodeSuccess, decodedTable = pcall(function()
+            return HttpService:JSONDecode(fileContents)
+        end)
+        
+        if decodeSuccess and type(decodedTable) == "table" then
+            -- Safely migrate values into original config matrix pointers
+            for key, value in pairs(decodedTable) do
+                if type(value) == "table" and type(Config[key]) == "table" then
+                    for subKey, subValue in pairs(value) do
+                        Config[key][subKey] = subValue
+                    end
+                else
+                    Config[key] = value
+                end
+            end
+            
+            -- Push data updates back up to structural visual layers
+            if ToggleRegistry["PetHuntEnabled"] then ToggleRegistry["PetHuntEnabled"](Config.PetHuntEnabled) end
+            if ToggleRegistry["ProtectionEnabled"] then ToggleRegistry["ProtectionEnabled"](Config.ProtectionEnabled) end
+            if ToggleRegistry["AutoRemoveOtherGardens"] then ToggleRegistry["AutoRemoveOtherGardens"](Config.AutoRemoveOtherGardens) end
+            
+            for petName, isTargeted in pairs(Config.TargetPets) do
+                if ToggleRegistry["Pet_" .. petName] then
+                    ToggleRegistry["Pet_" .. petName](isTargeted)
+                end
+            end
+            
+            print("[CONFIG]: Setup configuration loaded and applied successfully.")
+        end
+    end
+end
 
 -- Advanced Multi-Layered Ownership Guard Engine
 local function isMyGarden(garden)
@@ -225,7 +279,6 @@ local function applyAggressiveLagReduction()
         end)
     end
     
-    -- Error-insulated hardware controls
     pcall(function()
         settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalThrottle.Enabled
     end)
@@ -596,7 +649,7 @@ function ViewCreator.SetupCanvas(titleName, viewContainer)
     return ViewFrame, Scroll
 end
 
-function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickEvent)
+function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickEvent, registryKey)
     local Card = Instance.new("Frame")
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
@@ -642,6 +695,7 @@ function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickE
     
     local currentState = checkState
     local function updateVisuals(enabled)
+        currentState = enabled
         if enabled then
             ToggleFrame.BackgroundColor3 = Color3.fromRGB(0, 180, 110)
             SliderDot.Position = UDim2.new(1, -17, 0.5, -7)
@@ -651,6 +705,10 @@ function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickE
             SliderDot.Position = UDim2.new(0, 3, 0.5, -7)
             SliderDot.BackgroundColor3 = Color3.fromRGB(150, 150, 155)
         end
+    end
+    
+    if registryKey then
+        ToggleRegistry[registryKey] = updateVisuals
     end
     
     updateVisuals(currentState)
@@ -710,17 +768,18 @@ local Nav = Sidebar.new(App.Sidebar)
 -- Build Core Tabs Canvas Arrays
 local HuntView, HuntScroll = ViewCreator.SetupCanvas("Pet Interception System", App.ViewContainer)
 local MiscView, MiscScroll = ViewCreator.SetupCanvas("More FPS & Optimization", App.ViewContainer)
+local ConfigView, ConfigScroll = ViewCreator.SetupCanvas("Config Manager (JSON)", App.ViewContainer)
 
 -- ---------------------------------------------------------------------
 -- TAB 1: PET HUNTER ENGINE CONFIGURATION
 -- ---------------------------------------------------------------------
 ViewCreator.AddToggleCard(HuntScroll, "⭐ ENABLE AUTO PET HUNT", Config.PetHuntEnabled, function(bool)
     Config.PetHuntEnabled = bool
-end)
+end, "PetHuntEnabled")
 
 ViewCreator.AddToggleCard(HuntScroll, "🛡️ PET PURCHASE PROTECTION", Config.ProtectionEnabled, function(bool)
     Config.ProtectionEnabled = bool
-end)
+end, "ProtectionEnabled")
 
 local Database = {
     {"Frog", "Common ($10K)"},
@@ -747,7 +806,7 @@ for _, petData in ipairs(Database) do
     
     ViewCreator.AddToggleCard(HuntScroll, "Target: " .. displayName .. " [" .. details .. "]", Config.TargetPets[configKey], function(bool)
         Config.TargetPets[configKey] = bool
-    end)
+    end, "Pet_" .. configKey)
 end
 
 -- ---------------------------------------------------------------------
@@ -761,16 +820,31 @@ end)
 ViewCreator.AddToggleCard(MiscScroll, "Auto Remove Other Gardens (Loop)", Config.AutoRemoveOtherGardens, function(bool)
     Config.AutoRemoveOtherGardens = bool
     if bool then removeOtherGardensInstantly() end
-end)
+end, "AutoRemoveOtherGardens")
 
 ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", function()
     applyAggressiveLagReduction()
     print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
 end)
 
+-- ---------------------------------------------------------------------
+-- TAB 3: CONFIG MANAGE SYSTEM (JSON DRIVEN)
+-- ---------------------------------------------------------------------
+ViewCreator.AddActionCard(ConfigScroll, "Save Current System Settings", "Save Config", function()
+    saveConfig()
+end)
+
+ViewCreator.AddActionCard(ConfigScroll, "Load Configuration History", "Load Config", function()
+    loadConfig()
+end)
+
 -- Register Sidebar Matrix Components
 Nav:RegisterTab("Pet Hunter", "🐾", HuntView)
 Nav:RegisterTab("Misc", "⚙️", MiscView)
+Nav:RegisterTab("Configs", "💾", ConfigView)
 
-print("[SYSTEM]: Layout Engine Version 4.3 fully loaded. Error-proof sequence active.")
+-- Automated Workspace State Setup: Auto Load JSON Configuration File
+pcall(loadConfig)
+
+print("[SYSTEM]: Layout Engine Version 4.4 fully loaded. Persistent file system hooks online.")
 ]])()
