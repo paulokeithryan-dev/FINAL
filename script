@@ -1,0 +1,611 @@
+-- =====================================================================
+-- PREMIUM UI ENGINE - VERSION 3.9 (DYNAMIC VELOCITY & MINIMIZE INTERFACE)
+-- =====================================================================
+
+-- Global Configuration Matrix
+local Config = {
+    PetHuntEnabled = false,
+    ProtectionEnabled = false, 
+    ProtectionRadius = 15,     
+    TargetPets = {
+        ["Bunny"] = false,
+        ["Frog"] = false,
+        ["Owl"] = false,
+        ["Deer"] = false,
+        ["Robin"] = false,
+        ["Turtle"] = false,
+        ["Bee"] = false,
+        ["Raccoon"] = false,
+        ["Monkey"] = false,
+        ["Unicorn"] = false,
+        ["GoldenDragonfly"] = false,
+        ["Bear"] = false,
+        ["BlackDragon"] = false,
+        ["IceSerpent"] = false,
+    },
+    FlyHeight = 2.2,
+    TweenSpeed = 38,          -- OPTIMIZED: Safe speed to stop anti-cheat rubber-banding
+    CombatDashSpeed = 155     -- TACTICAL: Hyper-speed triggered ONLY when intercepting thieves
+}
+
+-- ---------------------------------------------------------------------
+-- SERVICE HOOKS & BACKGROUND AUTO-TRACKING ENGINE
+-- ---------------------------------------------------------------------
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager") 
+local LocalPlayer = Players.LocalPlayer
+
+local function smoothFlyTo(targetCFrame, speedOverride)
+    local character = LocalPlayer.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local speed = speedOverride or Config.TweenSpeed
+    local distance = (rootPart.Position - targetCFrame.Position).Magnitude
+    local duration = distance / speed
+    
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+    local flight = TweenService:Create(rootPart, tweenInfo, {CFrame = targetCFrame})
+    flight:Play()
+    flight.Completed:Wait()
+end
+
+-- Dual-Action Strike: Instantly spams remotes to bypass hardware animation cooldowns
+local function executeDualActionStrike(shovel)
+    local camera = workspace.CurrentCamera
+    if camera then
+        local safeX = 20
+        local safeY = 220 
+        
+        VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 0)
+        VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 0)
+    end
+    
+    if shovel then
+        shovel:Activate() 
+        -- COOLDOWN BYPASS: Unrolled loop floods the network channel instantly in 1 frame
+        for _, obj in ipairs(shovel:GetDescendants()) do
+            if obj:IsA("RemoteEvent") or obj:IsA("UnreliableRemoteEvent") then
+                obj:FireServer() 
+                obj:FireServer() -- Double-pump packets to override client debounces
+            end
+        end
+    end
+end
+
+-- Tactical Intercept: Triggers MAXIMUM speed to protect pet, then returns smoothly
+local function executeInterceptionManeuver(thiefRoot, petRoot)
+    local character = LocalPlayer.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not rootPart or not humanoid then return end
+    
+    print("[TACTICAL]: Thief detected! Overriding velocity matrix to Max Combat Speed.")
+    
+    local shovel = character:FindFirstChild("Shovel") or LocalPlayer.Backpack:FindFirstChild("Shovel")
+    if shovel and shovel.Parent == LocalPlayer.Backpack then
+        humanoid:EquipTool(shovel)
+        task.wait(0.02) 
+    end
+    
+    -- Dash at maximum combat speed directly onto the thief
+    local strikePosition = thiefRoot.CFrame * CFrame.new(0, 0, 1.2)
+    smoothFlyTo(strikePosition, Config.CombatDashSpeed)
+    
+    -- Rapid fire machine-gun attack cycle
+    if shovel then
+        for i = 1, 10 do
+            executeDualActionStrike(shovel)
+            task.wait() -- Lowest possible engine yield (1 frame flat)
+        end
+    end
+    
+    -- Secure back to the pet at combat speed
+    local returnPosition = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
+    smoothFlyTo(returnPosition, Config.CombatDashSpeed)
+end
+
+-- Dedicated Auto-Buy Fire Prompt Executor
+local function deployPurchaseInterception(activeTarget, rootPart)
+    if not fireproximityprompt then return end
+    
+    if activeTarget then
+        for _, obj in ipairs(activeTarget:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                fireproximityprompt(obj)
+            end
+        end
+    end
+    
+    local gardens = workspace:FindFirstChild("Gardens")
+    if gardens then
+        for _, obj in ipairs(gardens:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                if obj:FindFirstAncestor("Signs") or string.find(obj.Name:lower(), "mailbox") or string.find(obj.Name:lower(), "sign") then
+                    continue 
+                end
+                
+                local parentPart = obj.Parent
+                if parentPart and parentPart:IsA("BasePart") then
+                    local distance = (parentPart.Position - rootPart.Position).Magnitude
+                    if distance <= 20 then
+                        fireproximityprompt(obj)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Background Autoclicker Safeguard Thread
+task.spawn(function()
+    while task.wait(0.02) do 
+        if Config.ProtectionEnabled and Config.PetHuntEnabled then
+            local character = LocalPlayer.Character
+            local shovel = character and character:FindFirstChild("Shovel")
+            local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+            
+            if shovel and rootPart then
+                local playerNearby = false
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        local dist = (player.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude
+                        if dist <= (Config.ProtectionRadius + 5) then
+                            playerNearby = true
+                            break
+                        end
+                    end
+                end
+                
+                if playerNearby then
+                    executeDualActionStrike(shovel)
+                end
+            end
+        end
+    end
+end)
+
+-- Dedicated Background Worker Thread
+task.spawn(function()
+    local lastPromptCheck = 0
+    
+    while task.wait(0.1) do
+        if Config.PetHuntEnabled then
+            local character = LocalPlayer.Character
+            local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            
+            local mapFolder = workspace:FindFirstChild("Map")
+            local wildFolder = mapFolder and mapFolder:FindFirstChild("WildPetSpawns")
+            
+            if rootPart and wildFolder and humanoid then
+                local activeTarget = nil
+                
+                for _, petModel in ipairs(wildFolder:GetChildren()) do
+                    local attributeName = petModel:GetAttribute("PetName")
+                    if attributeName then
+                        local internalKey = string.gsub(attributeName, "%s+", "")
+                        if (Config.TargetPets[attributeName] or Config.TargetPets[internalKey]) and petModel:FindFirstChild("RootPart") then
+                            activeTarget = petModel
+                            break
+                        end
+                    end
+                end
+                
+                if activeTarget then
+                    local petRoot = activeTarget.RootPart
+                    local petName = activeTarget:GetAttribute("PetName") or activeTarget.Name
+                    print("[HUNTER]: Safe navigation tracking locked onto " .. tostring(petName))
+                    
+                    local shovel = character:FindFirstChild("Shovel") or LocalPlayer.Backpack:FindFirstChild("Shovel")
+                    if shovel and shovel.Parent == LocalPlayer.Backpack then
+                        humanoid:EquipTool(shovel)
+                        task.wait(0.1) 
+                    end
+                    
+                    -- Smooth flight down to target destination using safe speed matrix
+                    smoothFlyTo(petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0), Config.TweenSpeed)
+                    
+                    while Config.PetHuntEnabled and activeTarget and activeTarget:IsDescendantOf(wildFolder) and petRoot do
+                        
+                        local closestThief = nil
+                        if Config.ProtectionEnabled then
+                            for _, player in ipairs(Players:GetPlayers()) do
+                                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                                    local playerRoot = player.Character.HumanoidRootPart
+                                    local distanceToPet = (playerRoot.Position - petRoot.Position).Magnitude
+                                    if distanceToPet <= Config.ProtectionRadius then
+                                        closestThief = playerRoot
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                        
+                        if closestThief then
+                            executeInterceptionManeuver(closestThief, petRoot)
+                        else
+                            rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
+                            if shovel and shovel.Parent == LocalPlayer.Backpack then
+                                humanoid:EquipTool(shovel)
+                            end
+                        end
+                        
+                        if os.clock() - lastPromptCheck > 0.05 then
+                            lastPromptCheck = os.clock()
+                            deployPurchaseInterception(activeTarget, rootPart)
+                        end
+                        task.wait()
+                    end
+                    
+                    deployPurchaseInterception(nil, rootPart)
+                    print("[HUNTER]: Target tracking concluded.")
+                end
+            end
+        end
+    end
+end)
+
+-- ---------------------------------------------------------------------
+-- UI ENGINE CODE ARCHITECTURE (WITH INTERFACE MINIMIZER)
+-- ---------------------------------------------------------------------
+local BaseLayout = {}
+BaseLayout.__index = BaseLayout
+
+function BaseLayout.new()
+    local self = setmetatable({}, BaseLayout)
+    local targetParent = (gethui and gethui()) or game:GetService("CoreGui") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+    if targetParent:FindFirstChild("SleekPremiumUI") then targetParent.SleekPremiumUI:Destroy() end
+    
+    self.ScreenGui = Instance.new("ScreenGui")
+    self.ScreenGui.Name = "SleekPremiumUI"
+    self.ScreenGui.ResetOnSpawn = false
+    self.ScreenGui.Parent = targetParent
+    
+    self.MainWindow = Instance.new("Frame")
+    self.MainWindow.Size = UDim2.new(0, 580, 0, 380)
+    self.MainWindow.Position = UDim2.new(0.5, -290, 0.5, -190)
+    self.MainWindow.BackgroundColor3 = Color3.fromRGB(24, 24, 26)
+    self.MainWindow.BorderSizePixel = 0
+    self.MainWindow.Active = true
+    self.MainWindow.Draggable = true
+    self.MainWindow.Parent = self.ScreenGui
+    
+    local MainCorner = Instance.new("UICorner")
+    MainCorner.CornerRadius = UDim.new(0, 12)
+    MainCorner.Parent = self.MainWindow
+    
+    self.Sidebar = Instance.new("Frame")
+    self.Sidebar.Size = UDim2.new(0, 150, 1, 0)
+    self.Sidebar.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
+    self.Sidebar.BorderSizePixel = 0
+    self.Sidebar.Parent = self.MainWindow
+    
+    local SidebarCorner = Instance.new("UICorner")
+    SidebarCorner.CornerRadius = UDim.new(0, 12)
+    SidebarCorner.Parent = self.Sidebar
+    
+    local SidebarFix = Instance.new("Frame")
+    SidebarFix.Size = UDim2.new(0, 20, 1, 0)
+    SidebarFix.Position = UDim2.new(1, -20, 0, 0)
+    SidebarFix.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
+    SidebarFix.BorderSizePixel = 0
+    SidebarFix.Parent = self.Sidebar
+    
+    self.ViewContainer = Instance.new("Frame")
+    self.ViewContainer.Size = UDim2.new(1, -170, 1, -20)
+    self.ViewContainer.Position = UDim2.new(0, 160, 0, 10)
+    self.ViewContainer.BackgroundTransparency = 1
+    self.ViewContainer.Parent = self.MainWindow
+
+    -- Minimize Action Controls
+    local MinimizeBtn = Instance.new("TextButton")
+    MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
+    MinimizeBtn.Position = UDim2.new(1, -34, 0, 8)
+    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(32, 32, 36)
+    MinimizeBtn.Text = "—"
+    MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 205)
+    MinimizeBtn.Font = Enum.Font.GothamBold
+    MinimizeBtn.TextSize = 12
+    MinimizeBtn.Parent = self.MainWindow
+
+    local MinCorner = Instance.new("UICorner")
+    MinCorner.CornerRadius = UDim.new(0, 6)
+    MinCorner.Parent = MinimizeBtn
+
+    local RestoreBtn = Instance.new("TextButton")
+    RestoreBtn.Size = UDim2.new(0, 85, 0, 30)
+    RestoreBtn.Position = UDim2.new(0, 15, 0, 15) -- Left side layout placement
+    RestoreBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 26)
+    RestoreBtn.Text = "Open UI"
+    RestoreBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    RestoreBtn.Font = Enum.Font.GothamMedium
+    RestoreBtn.TextSize = 12
+    RestoreBtn.Visible = false
+    RestoreBtn.Parent = self.ScreenGui
+
+    local RestoreCorner = Instance.new("UICorner")
+    RestoreCorner.CornerRadius = UDim.new(0, 6)
+    RestoreCorner.Parent = RestoreBtn
+
+    local RestoreStroke = Instance.new("UIStroke")
+    RestoreStroke.Color = Color3.fromRGB(45, 45, 48)
+    RestoreStroke.Thickness = 1
+    RestoreStroke.Parent = RestoreBtn
+
+    MinimizeBtn.MouseButton1Click:Connect(function()
+        self.MainWindow.Visible = false
+        RestoreBtn.Visible = true
+    end)
+
+    RestoreBtn.MouseButton1Click:Connect(function()
+        self.MainWindow.Visible = true
+        RestoreBtn.Visible = false
+    end)
+    
+    return self
+end
+
+local Sidebar = {}
+Sidebar.__index = Sidebar
+
+function Sidebar.new(sidebarFrame)
+    local self = setmetatable({}, Sidebar)
+    self.Buttons = {}
+    self.Tabs = {}
+    
+    local SearchBox = Instance.new("Frame")
+    SearchBox.Size = UDim2.new(1, -16, 0, 32)
+    SearchBox.Position = UDim2.new(0, 8, 0, 12)
+    SearchBox.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+    SearchBox.BorderSizePixel = 0
+    SearchBox.Parent = sidebarFrame
+    
+    local SearchCorner = Instance.new("UICorner")
+    SearchCorner.CornerRadius = UDim.new(0, 6)
+    SearchCorner.Parent = SearchBox
+    
+    local SearchText = Instance.new("TextLabel")
+    SearchText.Size = UDim2.new(1, -10, 1, 0)
+    SearchText.Position = UDim2.new(0, 10, 0, 0)
+    SearchText.BackgroundTransparency = 1
+    SearchText.Text = "🔍 Search"
+    SearchText.TextColor3 = Color3.fromRGB(110, 110, 115)
+    SearchText.TextSize = 12
+    SearchText.Font = Enum.Font.Gotham
+    SearchText.TextXAlignment = Enum.TextXAlignment.Left
+    SearchText.Parent = SearchBox
+    
+    local ListContainer = Instance.new("Frame")
+    ListContainer.Size = UDim2.new(1, 0, 1, -60)
+    ListContainer.Position = UDim2.new(0, 0, 0, 55)
+    ListContainer.BackgroundTransparency = 1
+    ListContainer.Parent = sidebarFrame
+    
+    local ListLayout = Instance.new("UIListLayout")
+    ListLayout.Padding = UDim.new(0, 4)
+    ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ListLayout.Parent = ListContainer
+    
+    local ListPadding = Instance.new("UIPadding")
+    ListPadding.PaddingLeft = UDim.new(0, 8)
+    ListPadding.PaddingRight = UDim.new(0, 8)
+    ListPadding.Parent = ListContainer
+    
+    self.Container = ListContainer
+    return self
+end
+
+function Sidebar:RegisterTab(tabName, associatedViewFrame)
+    local order = #self.Buttons + 1
+    self.Tabs[tabName] = associatedViewFrame
+    
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(1, 0, 0, 34)
+    Btn.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
+    Btn.Text = "      " .. tabName
+    Btn.TextColor3 = Color3.fromRGB(160, 160, 165)
+    Btn.Font = Enum.Font.GothamMedium
+    Btn.TextSize = 12
+    Btn.TextXAlignment = Enum.TextXAlignment.Left
+    Btn.LayoutOrder = order
+    Btn.Parent = self.Container
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+    BtnCorner.Parent = Btn
+    
+    local ActiveStrip = Instance.new("Frame")
+    ActiveStrip.Name = "ActiveStrip"
+    ActiveStrip.Size = UDim2.new(0, 3, 0, 16)
+    ActiveStrip.Position = UDim2.new(0, 8, 0.5, -8)
+    ActiveStrip.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ActiveStrip.BorderSizePixel = 0
+    ActiveStrip.Visible = false
+    ActiveStrip.Parent = Btn
+    
+    Btn.MouseButton1Click:Connect(function()
+        for name, view in pairs(self.Tabs) do view.Visible = (name == tabName) end
+        for _, otherBtn in pairs(self.Buttons) do
+            otherBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
+            otherBtn.TextColor3 = Color3.fromRGB(160, 160, 165)
+            local strip = otherBtn:FindFirstChild("ActiveStrip")
+            if strip then strip.Visible = false end
+        end
+        Btn.BackgroundColor3 = Color3.fromRGB(32, 32, 36)
+        Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ActiveStrip.Visible = true
+    end)
+    
+    table.insert(self.Buttons, Btn)
+    
+    if order == 1 then
+        associatedViewFrame.Visible = true
+        Btn.BackgroundColor3 = Color3.fromRGB(32, 32, 36)
+        Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ActiveStrip.Visible = true
+    else
+        associatedViewFrame.Visible = false
+    end
+end
+
+-- ---------------------------------------------------------------------
+-- INTERFACE RENDERING ENGINE MATRIX
+-- ---------------------------------------------------------------------
+local ViewCreator = {}
+
+function ViewCreator.SetupCanvas(titleName, viewContainer)
+    local ViewFrame = Instance.new("Frame")
+    ViewFrame.Size = UDim2.new(1, 0, 1, 0)
+    ViewFrame.BackgroundTransparency = 1
+    ViewFrame.Visible = false
+    ViewFrame.Parent = viewContainer
+    
+    local HeaderTitle = Instance.new("TextLabel")
+    HeaderTitle.Size = UDim2.new(1, -40, 0, 32)
+    HeaderTitle.Position = UDim2.new(0, 0, 0, 5)
+    HeaderTitle.BackgroundTransparency = 1
+    HeaderTitle.Text = titleName
+    HeaderTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    HeaderTitle.TextSize = 22
+    HeaderTitle.Font = Enum.Font.GothamBold
+    HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
+    HeaderTitle.Parent = ViewFrame
+    
+    local Scroll = Instance.new("ScrollingFrame")
+    Scroll.Size = UDim2.new(1, 0, 1, -45)
+    Scroll.Position = UDim2.new(0, 0, 0, 45)
+    Scroll.BackgroundTransparency = 1
+    Scroll.BorderSizePixel = 0
+    Scroll.ScrollBarThickness = 4
+    Scroll.ScrollBarImageColor3 = Color3.fromRGB(65, 65, 70)
+    Scroll.Parent = ViewFrame
+    
+    local ListLayout = Instance.new("UIListLayout")
+    ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ListLayout.Padding = UDim.new(0, 6)
+    ListLayout.Parent = Scroll
+    
+    ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        Scroll.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 12)
+    end)
+    
+    return ViewFrame, Scroll
+end
+
+function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickEvent)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, -8, 0, 42)
+    Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+    Card.BorderSizePixel = 0
+    Card.Parent = scrollTarget
+    
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 8)
+    CardCorner.Parent = Card
+    
+    local CardTitle = Instance.new("TextLabel")
+    CardTitle.Size = UDim2.new(0.6, 0, 1, 0)
+    CardTitle.Position = UDim2.new(0, 12, 0, 0)
+    CardTitle.BackgroundTransparency = 1
+    CardTitle.Text = labelText
+    CardTitle.TextColor3 = Color3.fromRGB(230, 230, 235)
+    CardTitle.TextSize = 13
+    CardTitle.Font = Enum.Font.GothamMedium
+    CardTitle.TextXAlignment = Enum.TextXAlignment.Left
+    CardTitle.Parent = Card
+    
+    local ToggleFrame = Instance.new("TextButton")
+    ToggleFrame.Size = UDim2.new(0, 42, 0, 20)
+    ToggleFrame.Position = UDim2.new(1, -54, 0.5, -10)
+    ToggleFrame.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
+    ToggleFrame.Text = ""
+    ToggleFrame.Parent = Card
+    
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(1, 0)
+    ToggleCorner.Parent = ToggleFrame
+    
+    local SliderDot = Instance.new("Frame")
+    SliderDot.Size = UDim2.new(0, 14, 0, 14)
+    SliderDot.Position = UDim2.new(0, 3, 0.5, -7)
+    SliderDot.BackgroundColor3 = Color3.fromRGB(150, 150, 155)
+    SliderDot.BorderSizePixel = 0
+    SliderDot.Parent = ToggleFrame
+    
+    local DotCorner = Instance.new("UICorner")
+    DotCorner.CornerRadius = UDim.new(1, 0)
+    DotCorner.Parent = SliderDot
+    
+    local currentState = checkState
+    local function updateVisuals(enabled)
+        if enabled then
+            ToggleFrame.BackgroundColor3 = Color3.fromRGB(0, 180, 110)
+            SliderDot.Position = UDim2.new(1, -17, 0.5, -7)
+            SliderDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            ToggleFrame.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
+            SliderDot.Position = UDim2.new(0, 3, 0.5, -7)
+            SliderDot.BackgroundColor3 = Color3.fromRGB(150, 150, 155)
+        end
+    end
+    
+    updateVisuals(currentState)
+    
+    ToggleFrame.MouseButton1Click:Connect(function()
+        currentState = not currentState
+        updateVisuals(currentState)
+        onClickEvent(currentState)
+    end)
+end
+
+-- ---------------------------------------------------------------------
+-- RUNTIME DEPLOYMENT ENGINE
+-- ---------------------------------------------------------------------
+local App = BaseLayout.new()
+local Nav = Sidebar.new(App.Sidebar)
+
+local HuntView, HuntScroll = ViewCreator.SetupCanvas("Pet Interception System", App.ViewContainer)
+
+-- Master Controls Matrix
+ViewCreator.AddToggleCard(HuntScroll, "⭐ ENABLE AUTO PET HUNT", Config.PetHuntEnabled, function(bool)
+    Config.PetHuntEnabled = bool
+end)
+
+ViewCreator.AddToggleCard(HuntScroll, "🛡️ PET PURCHASE PROTECTION", Config.ProtectionEnabled, function(bool)
+    Config.ProtectionEnabled = bool
+end)
+
+-- Full Target Database Compilation
+local Database = {
+    {"Frog", "Common ($10K)"},
+    {"Bunny", "Common ($20K)"},
+    {"Owl", "Uncommon ($25K)"},
+    {"Deer", "Rare ($50K)"},
+    {"Turtle", "Rare ($70K)"},
+    {"Robin", "Legendary ($75K)"},
+    {"Bee", "Legendary ($1M)"},
+    {"Monkey", "Mythic ($1M)"},
+    {"Golden Dragonfly", "GoldenDragonfly", "Mythic ($3M)"},
+    {"Unicorn", "Mythic ($4M)"},
+    {"Raccoon", "Super ($5M)"},
+    {"Bear", "Mythic ($5M)"},
+    {"Black Dragon", "BlackDragon", "Super ($20M)"},
+    {"Ice Serpent", "IceSerpent", "Super ($20M)"}
+}
+
+for _, petData in ipairs(Database) do
+    local displayName = petData[1]
+    local configKey = petData[2]
+    local details = petData[3] or petData[2]
+    
+    if not petData[3] then configKey = displayName end
+    
+    ViewCreator.AddToggleCard(HuntScroll, "Target: " .. displayName .. " [" .. details .. "]", Config.TargetPets[configKey], function(bool)
+        Config.TargetPets[configKey] = bool
+    end)
+end
+
+Nav:RegisterTab("Pet Hunter", HuntView)
+print("[SYSTEM]: Layout Engine Version 3.9 successfully deployed.")
