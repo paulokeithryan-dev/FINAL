@@ -1,5 +1,5 @@
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 4.1 (ULTIMATE PERFORMANCE EDITION)
+-- PREMIUM UI ENGINE - VERSION 4.2 (STREAMLINED OPTIMIZATION)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -24,13 +24,11 @@ local Config = {
         ["IceSerpent"] = false,
     },
     FlyHeight = 2.2,
-    TweenSpeed = 38,          -- OPTIMIZED: Safe speed to stop anti-cheat rubber-banding
-    CombatDashSpeed = 155,    -- TACTICAL: Hyper-speed triggered ONLY when intercepting thieves
+    TweenSpeed = 38,          
+    CombatDashSpeed = 155,    
     
     -- MISC OPTIMIZATION CONSTANTS
-    AutoRemoveOtherGardens = false,
-    BlackScreenEnabled = false,
-    WhiteScreenEnabled = false
+    AutoRemoveOtherGardens = false
 }
 
 -- ---------------------------------------------------------------------
@@ -70,11 +68,10 @@ local function executeDualActionStrike(shovel)
     
     if shovel then
         shovel:Activate() 
-        -- COOLDOWN BYPASS: Unrolled loop floods the network channel instantly in 1 frame
         for _, obj in ipairs(shovel:GetDescendants()) do
             if obj:IsA("RemoteEvent") or obj:IsA("UnreliableRemoteEvent") then
                 obj:FireServer() 
-                obj:FireServer() -- Double-pump packets to override client debounces
+                obj:FireServer() 
             end
         end
     end
@@ -95,19 +92,16 @@ local function executeInterceptionManeuver(thiefRoot, petRoot)
         task.wait(0.02) 
     end
     
-    -- Dash at maximum combat speed directly onto the thief
     local strikePosition = thiefRoot.CFrame * CFrame.new(0, 0, 1.2)
     smoothFlyTo(strikePosition, Config.CombatDashSpeed)
     
-    -- Rapid fire machine-gun attack cycle
     if shovel then
         for i = 1, 10 do
             executeDualActionStrike(shovel)
-            task.wait() -- Lowest possible engine yield (1 frame flat)
+            task.wait() 
         end
     end
     
-    -- Secure back to the pet at combat speed
     local returnPosition = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
     smoothFlyTo(returnPosition, Config.CombatDashSpeed)
 end
@@ -150,17 +144,14 @@ end
 
 -- Advanced Multi-Layered Ownership Guard Engine
 local function isMyGarden(garden)
-    -- Identity String Scan Matrix
     if garden.Name == LocalPlayer.Name or string.find(garden.Name, tostring(LocalPlayer.UserId)) then
         return true
     end
     
-    -- Attribute Metadata Validation Check
     if garden:GetAttribute("Owner") == LocalPlayer.Name or garden:GetAttribute("Owner") == LocalPlayer.UserId or garden:GetAttribute("OwnerID") == LocalPlayer.UserId then
         return true
     end
     
-    -- Complete Object & Descendant Data Audit Tree
     for _, child in ipairs(garden:GetDescendants()) do
         if child:IsA("ValueBase") and (child.Value == LocalPlayer or child.Value == LocalPlayer.Name or tostring(child.Value) == tostring(LocalPlayer.UserId)) then
             return true
@@ -177,7 +168,6 @@ local function removeOtherGardensInstantly()
     local gardensFolder = workspace:FindFirstChild("Gardens")
     if gardensFolder then
         for _, garden in ipairs(gardensFolder:GetChildren()) do
-            -- Verify against ownership protection matrix before purging instance
             if not isMyGarden(garden) then
                 garden:Destroy()
             end
@@ -186,21 +176,18 @@ local function removeOtherGardensInstantly()
 end
 
 local function applyAggressiveLagReduction()
-    -- Part 1: Heavy Global Atmospheric & Lighting Scraper
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 9e9
     Lighting.EnvironmentBlurIntensity = 0
     Lighting.EnvironmentDiffuseScale = 0
     Lighting.EnvironmentSpecularScale = 0
     
-    -- Clear post-processing render pipelines entirely
     for _, obj in ipairs(Lighting:GetChildren()) do
         if obj:IsA("PostEffect") or obj:IsA("Atmosphere") or obj:IsA("Sky") or obj:IsA("Clouds") then
             obj:Destroy()
         end
     end
     
-    -- Wipe 3D terrain fluid mechanics and global cloud layers
     local terrain = workspace:FindFirstChildOfClass("Terrain")
     if terrain then
         terrain.WaterWaveSize = 0
@@ -212,7 +199,6 @@ local function applyAggressiveLagReduction()
         if obj:IsA("Clouds") then obj:Destroy() end
     end
     
-    -- Part 2: High-Performance Geometry Flattening Loop (Protected Pcall Architecture)
     for _, instance in ipairs(workspace:GetDescendants()) do
         pcall(function()
             if instance:IsA("ParticleEmitter") or instance:IsA("Smoke") or instance:IsA("Sparkles") or instance:IsA("Fire") then
@@ -221,7 +207,7 @@ local function applyAggressiveLagReduction()
             elseif instance:IsA("Decal") or instance:IsA("Texture") then
                 instance:Destroy()
             elseif instance:IsA("MeshPart") then
-                instance.TextureID = "" -- Strip baked images to eliminate RAM allocation drops
+                instance.TextureID = "" 
                 instance.Material = Enum.Material.SmoothPlastic
                 instance.Reflectance = 0
             elseif instance:IsA("BasePart") and not instance:IsA("MeshPart") then
@@ -231,7 +217,6 @@ local function applyAggressiveLagReduction()
         end)
     end
     
-    -- Lock global rendering engine parameters down to minimum processing overhead
     settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalThrottle.Enabled
 end
 
@@ -269,7 +254,6 @@ task.spawn(function()
     local lastGardenClean = 0
     
     while task.wait(0.1) do
-        -- Dynamic Garbage Collector Loop
         if Config.AutoRemoveOtherGardens and (os.clock() - lastGardenClean > 1.5) then
             lastGardenClean = os.clock()
             removeOtherGardensInstantly()
@@ -401,15 +385,6 @@ function BaseLayout.new()
     self.ViewContainer.Position = UDim2.new(0, 160, 0, 10)
     self.ViewContainer.BackgroundTransparency = 1
     self.ViewContainer.Parent = self.MainWindow
-
-    -- Overlay Engine Blocks (White/Black Screens)
-    self.VisualOverlay = Instance.new("Frame")
-    self.VisualOverlay.Size = UDim2.new(1, 0, 1, 0)
-    self.VisualOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    self.VisualOverlay.BorderSizePixel = 0
-    self.VisualOverlay.ZIndex = 99999
-    self.VisualOverlay.Visible = false
-    self.VisualOverlay.Parent = self.ScreenGui
 
     -- Minimize Action Controls
     local MinimizeBtn = Instance.new("TextButton")
@@ -762,7 +737,7 @@ for _, petData in ipairs(Database) do
 end
 
 -- ---------------------------------------------------------------------
--- TAB 2: MISCELLANEOUS ENGINE OPTIMIZATION (MATCHING VISUAL SCHEMATICS)
+-- TAB 2: MISCELLANEOUS ENGINE OPTIMIZATION
 -- ---------------------------------------------------------------------
 ViewCreator.AddActionCard(MiscScroll, "Remove Other Gardens", "Clean", function()
     removeOtherGardensInstantly()
@@ -779,30 +754,8 @@ ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", f
     print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
 end)
 
-ViewCreator.AddToggleCard(MiscScroll, "Show Screen White", Config.WhiteScreenEnabled, function(bool)
-    Config.WhiteScreenEnabled = bool
-    if bool then
-        Config.BlackScreenEnabled = false
-        App.VisualOverlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        App.VisualOverlay.Visible = true
-    else
-        if not Config.BlackScreenEnabled then App.VisualOverlay.Visible = false end
-    end
-end)
-
-ViewCreator.AddToggleCard(MiscScroll, "Show Screen Black (CPU Saver)", Config.BlackScreenEnabled, function(bool)
-    Config.BlackScreenEnabled = bool
-    if bool then
-        Config.WhiteScreenEnabled = false
-        App.VisualOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        App.VisualOverlay.Visible = true
-    else
-        if not Config.WhiteScreenEnabled then App.VisualOverlay.Visible = false end
-    end
-end)
-
 -- Register Sidebar Matrix Components
 Nav:RegisterTab("Pet Hunter", "🐾", HuntView)
 Nav:RegisterTab("Misc", "⚙️", MiscView)
 
-print("[SYSTEM]: Layout Engine Version 4.1 fully loaded. Deep rendering purges operational.")
+print("[SYSTEM]: Layout Engine Version 4.2 fully loaded. Streamlined interface operational.")
