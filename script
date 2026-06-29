@@ -1,5 +1,5 @@
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 4.0 (INTEGRATED OPTIMIZATION MATRIX)
+-- PREMIUM UI ENGINE - VERSION 4.1 (ULTIMATE PERFORMANCE EDITION)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -147,12 +147,38 @@ end
 -- ---------------------------------------------------------------------
 -- PERFORMANCE OPTIMIZATION UTILITIES (MISC MODULE)
 -- ---------------------------------------------------------------------
+
+-- Advanced Multi-Layered Ownership Guard Engine
+local function isMyGarden(garden)
+    -- Identity String Scan Matrix
+    if garden.Name == LocalPlayer.Name or string.find(garden.Name, tostring(LocalPlayer.UserId)) then
+        return true
+    end
+    
+    -- Attribute Metadata Validation Check
+    if garden:GetAttribute("Owner") == LocalPlayer.Name or garden:GetAttribute("Owner") == LocalPlayer.UserId or garden:GetAttribute("OwnerID") == LocalPlayer.UserId then
+        return true
+    end
+    
+    -- Complete Object & Descendant Data Audit Tree
+    for _, child in ipairs(garden:GetDescendants()) do
+        if child:IsA("ValueBase") and (child.Value == LocalPlayer or child.Value == LocalPlayer.Name or tostring(child.Value) == tostring(LocalPlayer.UserId)) then
+            return true
+        end
+        if child:IsA("TextLabel") and (string.find(child.Text, LocalPlayer.Name) or (LocalPlayer.DisplayName and string.find(child.Text, LocalPlayer.DisplayName))) then
+            return true
+        end
+    end
+    
+    return false
+end
+
 local function removeOtherGardensInstantly()
     local gardensFolder = workspace:FindFirstChild("Gardens")
     if gardensFolder then
         for _, garden in ipairs(gardensFolder:GetChildren()) do
-            -- Client-side deletion targeting only foreign instances to maximize rendering bandwidth
-            if garden.Name ~= LocalPlayer.Name and not string.find(garden.Name, tostring(LocalPlayer.UserId)) then
+            -- Verify against ownership protection matrix before purging instance
+            if not isMyGarden(garden) then
                 garden:Destroy()
             end
         end
@@ -160,10 +186,21 @@ local function removeOtherGardensInstantly()
 end
 
 local function applyAggressiveLagReduction()
+    -- Part 1: Heavy Global Atmospheric & Lighting Scraper
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 9e9
-    settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalThrottle.Enabled
+    Lighting.EnvironmentBlurIntensity = 0
+    Lighting.EnvironmentDiffuseScale = 0
+    Lighting.EnvironmentSpecularScale = 0
     
+    -- Clear post-processing render pipelines entirely
+    for _, obj in ipairs(Lighting:GetChildren()) do
+        if obj:IsA("PostEffect") or obj:IsA("Atmosphere") or obj:IsA("Sky") or obj:IsA("Clouds") then
+            obj:Destroy()
+        end
+    end
+    
+    -- Wipe 3D terrain fluid mechanics and global cloud layers
     local terrain = workspace:FindFirstChildOfClass("Terrain")
     if terrain then
         terrain.WaterWaveSize = 0
@@ -171,14 +208,31 @@ local function applyAggressiveLagReduction()
         terrain.WaterReflectance = 0
         terrain.WaterDetail = Enum.WaterDetail.Low
     end
-    
-    for _, instance in ipairs(workspace:GetDescendants()) do
-        if instance:IsA("ParticleEmitter") or instance:IsA("Smoke") or instance:IsA("Sparkles") then
-            instance.Enabled = false
-        elseif instance:IsA("Decal") or instance:IsA("Texture") then
-            instance:Destroy()
-        end
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj:IsA("Clouds") then obj:Destroy() end
     end
+    
+    -- Part 2: High-Performance Geometry Flattening Loop (Protected Pcall Architecture)
+    for _, instance in ipairs(workspace:GetDescendants()) do
+        pcall(function()
+            if instance:IsA("ParticleEmitter") or instance:IsA("Smoke") or instance:IsA("Sparkles") or instance:IsA("Fire") then
+                instance.Enabled = false
+                instance:Destroy()
+            elseif instance:IsA("Decal") or instance:IsA("Texture") then
+                instance:Destroy()
+            elseif instance:IsA("MeshPart") then
+                instance.TextureID = "" -- Strip baked images to eliminate RAM allocation drops
+                instance.Material = Enum.Material.SmoothPlastic
+                instance.Reflectance = 0
+            elseif instance:IsA("BasePart") and not instance:IsA("MeshPart") then
+                instance.Material = Enum.Material.SmoothPlastic
+                instance.Reflectance = 0
+            end
+        end)
+    end
+    
+    -- Lock global rendering engine parameters down to minimum processing overhead
+    settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalThrottle.Enabled
 end
 
 -- Background Autoclicker Safeguard Thread
@@ -381,7 +435,7 @@ function BaseLayout.new()
     RestoreBtn.Font = Enum.Font.GothamMedium
     RestoreBtn.TextSize = 12
     RestoreBtn.Visible = false
-    RestoreBtn.ZIndex = 100000 -- Ensure visibility over dark overlays
+    RestoreBtn.ZIndex = 100000 
     RestoreBtn.Parent = self.ScreenGui
 
     local RestoreCorner = Instance.new("UICorner")
@@ -712,7 +766,7 @@ end
 -- ---------------------------------------------------------------------
 ViewCreator.AddActionCard(MiscScroll, "Remove Other Gardens", "Clean", function()
     removeOtherGardensInstantly()
-    print("[OPTIMIZATION]: Executed instant baseline memory purge.")
+    print("[OPTIMIZATION]: Executed instant targeted memory purge.")
 end)
 
 ViewCreator.AddToggleCard(MiscScroll, "Auto Remove Other Gardens (Loop)", Config.AutoRemoveOtherGardens, function(bool)
@@ -722,7 +776,7 @@ end)
 
 ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", function()
     applyAggressiveLagReduction()
-    print("[OPTIMIZATION]: 3D Lighting and complex client assets optimized.")
+    print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
 end)
 
 ViewCreator.AddToggleCard(MiscScroll, "Show Screen White", Config.WhiteScreenEnabled, function(bool)
@@ -751,4 +805,4 @@ end)
 Nav:RegisterTab("Pet Hunter", "🐾", HuntView)
 Nav:RegisterTab("Misc", "⚙️", MiscView)
 
-print("[SYSTEM]: Layout Engine Version 4.0 fully loaded. Optimization subroutines initialized.")
+print("[SYSTEM]: Layout Engine Version 4.1 fully loaded. Deep rendering purges operational.")
