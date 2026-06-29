@@ -1,6 +1,6 @@
 loadstring([[
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 4.6 (ESP MULTI-MATRIX MODULE)
+-- PREMIUM UI ENGINE - VERSION 4.7 (ESP MULTI-MATRIX MODULE + DROPDOWNS)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -350,7 +350,7 @@ local function renderESPForModel(petModel)
     local cleanName = string.gsub(petName, "%s+", "")
     
     -- Filter 1: Individual Species Match
-    if Config.ESPSelectedPets and Config.ESPSelectedPets ~= "" and Config.ESPSelectedPets ~= "Select Options" then
+    if Config.ESPSelectedPets and Config.ESPSelectedPets ~= "" and Config.ESPSelectedPets ~= "None" and Config.ESPSelectedPets ~= "Select Options" then
         local foundMatch = false
         for token in string.gmatch(Config.ESPSelectedPets, "[^,%s]+") do
             if string.lower(cleanName) == string.lower(token) or string.lower(petName) == string.lower(token) then
@@ -372,7 +372,7 @@ local function renderESPForModel(petModel)
         end
     end
     
-    if Config.ESPSelectedRarities and Config.ESPSelectedRarities ~= "" and Config.ESPSelectedRarities ~= "Select Options" then
+    if Config.ESPSelectedRarities and Config.ESPSelectedRarities ~= "" and Config.ESPSelectedRarities ~= "None" and Config.ESPSelectedRarities ~= "Select Options" then
         local foundMatch = false
         for token in string.gmatch(Config.ESPSelectedRarities, "[^,%s]+") do
             if string.lower(petRarity) == string.lower(token) then
@@ -385,7 +385,7 @@ local function renderESPForModel(petModel)
     
     -- Filter 3: Volumetric Size Evaluation
     local rawSize = petModel:GetAttribute("PetSize") or petModel:GetAttribute("Size") or "Normal"
-    if Config.ESPSelectedSizes and Config.ESPSelectedSizes ~= "" and Config.ESPSelectedSizes ~= "Select Options" then
+    if Config.ESPSelectedSizes and Config.ESPSelectedSizes ~= "" and Config.ESPSelectedSizes ~= "None" and Config.ESPSelectedSizes ~= "Select Options" then
         local foundMatch = false
         for token in string.gmatch(Config.ESPSelectedSizes, "[^,%s]+") do
             if string.lower(tostring(rawSize)) == string.lower(token) then
@@ -1053,7 +1053,7 @@ function ViewCreator.AddActionCard(scrollTarget, labelText, buttonText, onClickE
     ActionBtn.MouseButton1Click:Connect(onClickEvent)
 end
 
-function ViewCreator.AddInputCard(scrollTarget, labelText, defaultText, onTextChange, registryKey)
+function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optionsList, onSelect, registryKey)
     local Card = Instance.new("Frame")
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
@@ -1075,33 +1075,111 @@ function ViewCreator.AddInputCard(scrollTarget, labelText, defaultText, onTextCh
     CardTitle.TextXAlignment = Enum.TextXAlignment.Left
     CardTitle.Parent = Card
     
-    local TextBox = Instance.new("TextBox")
-    TextBox.Size = UDim2.new(0.42, 0, 0, 26)
-    TextBox.Position = UDim2.new(1, -192, 0.5, -13)
-    TextBox.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
-    TextBox.Text = defaultText or ""
-    TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    TextBox.PlaceholderText = "Type tags..."
-    TextBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 105)
-    TextBox.Font = Enum.Font.Gotham
-    TextBox.TextSize = 12
-    TextBox.ClearTextOnFocus = false
-    TextBox.Parent = Card
+    local DropdownBtn = Instance.new("TextButton")
+    DropdownBtn.Size = UDim2.new(0.42, 0, 0, 26)
+    DropdownBtn.Position = UDim2.new(1, -192, 0.5, -13)
+    DropdownBtn.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
+    DropdownBtn.Text = defaultText or "Select Options"
+    DropdownBtn.TextColor3 = Color3.fromRGB(220, 220, 225)
+    DropdownBtn.Font = Enum.Font.Gotham
+    DropdownBtn.TextSize = 12
+    DropdownBtn.Parent = Card
     
-    local BoxCorner = Instance.new("UICorner")
-    BoxCorner.CornerRadius = UDim.new(0, 6)
-    BoxCorner.Parent = TextBox
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+    BtnCorner.Parent = DropdownBtn
+    
+    -- Overlay Container Layer (Parented directly to ScreenGui context to avoid scrolling frame canvas limits)
+    local DropdownList = Instance.new("ScrollingFrame")
+    DropdownList.Size = UDim2.new(0, 180, 0, 120)
+    DropdownList.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    DropdownList.BorderSizePixel = 0
+    DropdownList.ScrollBarThickness = 4
+    DropdownList.ScrollBarImageColor3 = Color3.fromRGB(70, 70, 75)
+    DropdownList.Visible = false
+    DropdownList.ZIndex = 5000
+    
+    local ListCorner = Instance.new("UICorner")
+    ListCorner.CornerRadius = UDim.new(0, 6)
+    ListCorner.Parent = DropdownList
+    
+    local ListStroke = Instance.new("UIStroke")
+    ListStroke.Color = Color3.fromRGB(48, 48, 54)
+    ListStroke.Thickness = 1
+    ListStroke.Parent = DropdownList
+
+    local ListLayout = Instance.new("UIListLayout")
+    ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ListLayout.Padding = UDim.new(0, 1)
+    ListLayout.Parent = DropdownList
+    
+    task.spawn(function()
+        local screenGui = scrollTarget:FindFirstAncestorOfClass("ScreenGui")
+        while not screenGui do
+            task.wait(0.1)
+            screenGui = scrollTarget:FindFirstAncestorOfClass("ScreenGui")
+        end
+        DropdownList.Parent = screenGui
+    end)
+    
+    local isOpen = false
+    local function toggleDropdown()
+        isOpen = not isOpen
+        if isOpen then
+            DropdownList.Position = UDim2.new(0, DropdownBtn.AbsolutePosition.X, 0, DropdownBtn.AbsolutePosition.Y + DropdownBtn.AbsoluteSize.Y + 3)
+            DropdownList.Size = UDim2.new(0, DropdownBtn.AbsoluteSize.X, 0, math.min(#optionsList * 26 + 4, 130))
+            DropdownList.Visible = true
+        else
+            DropdownList.Visible = false
+        end
+    end
+    
+    DropdownBtn.MouseButton1Click:Connect(toggleDropdown)
+    
+    -- Absolute tracking synchronization engine link
+    DropdownBtn:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+        if isOpen then
+            DropdownList.Position = UDim2.new(0, DropdownBtn.AbsolutePosition.X, 0, DropdownBtn.AbsolutePosition.Y + DropdownBtn.AbsoluteSize.Y + 3)
+        end
+    end)
     
     local function updateVisuals(txt)
-        TextBox.Text = txt
+        DropdownBtn.Text = txt
     end
     if registryKey then
         ToggleRegistry[registryKey] = updateVisuals
     end
     
-    TextBox.FocusLost:Connect(function()
-        onTextChange(TextBox.Text)
-    end)
+    for i, option in ipairs(optionsList) do
+        local OptBtn = Instance.new("TextButton")
+        OptBtn.Size = UDim2.new(1, 0, 0, 26)
+        OptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+        OptBtn.BorderSizePixel = 0
+        OptBtn.Text = "   " .. option
+        OptBtn.TextColor3 = Color3.fromRGB(190, 190, 195)
+        OptBtn.Font = Enum.Font.Gotham
+        OptBtn.TextSize = 12
+        OptBtn.TextXAlignment = Enum.TextXAlignment.Left
+        OptBtn.LayoutOrder = i
+        OptBtn.ZIndex = 5001
+        OptBtn.Parent = DropdownList
+        
+        OptBtn.MouseEnter:Connect(function()
+            OptBtn.BackgroundColor3 = Color3.fromRGB(38, 38, 44)
+            OptBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end)
+        OptBtn.MouseLeave:Connect(function()
+            OptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+            OptBtn.TextColor3 = Color3.fromRGB(190, 190, 195)
+        end)
+        
+        OptBtn.MouseButton1Click:Connect(function()
+            updateVisuals(option)
+            onSelect(option)
+            isOpen = false
+            DropdownList.Visible = false
+        end)
+    end
 end
 
 -- ---------------------------------------------------------------------
@@ -1199,19 +1277,23 @@ ViewCreator.AddToggleCard(MiscScroll, "Bypass Gameplay Paused", Config.BypassGam
     Config.BypassGameplayPaused = bool
 end, "BypassGameplayPaused")
 
--- EXTENDED MODULES: ESP SPAWNED PETS FIELD CONFIGURATION
+-- EXTENDED MODULES: MODULAR ESP DROPDOWNS INTEGRATION MATRIX
 ViewCreator.AddSectionHeader(MiscScroll, "ESP Spawned Pets")
 
-ViewCreator.AddInputCard(MiscScroll, "Select Pets", Config.ESPSelectedPets, function(txt)
-    Config.ESPSelectedPets = txt
+local petOptions = {"None", "Raccoon", "Robin", "Frog", "Bunny", "Deer", "Owl", "Bee", "Unicorn", "GoldenDragonfly", "IceSerpent"}
+local rarityOptions = {"None", "Epic", "Legendary", "Mythic", "Super", "Rare", "Uncommon", "Common"}
+local sizeOptions = {"None", "Big", "Huge"}
+
+ViewCreator.AddDropdownCard(MiscScroll, "Select Pets", Config.ESPSelectedPets, petOptions, function(selectedValue)
+    Config.ESPSelectedPets = selectedValue
 end, "ESPSelectedPets")
 
-ViewCreator.AddInputCard(MiscScroll, "Select Rarity Pets", Config.ESPSelectedRarities, function(txt)
-    Config.ESPSelectedRarities = txt
+ViewCreator.AddDropdownCard(MiscScroll, "Select Rarity Pets", Config.ESPSelectedRarities, rarityOptions, function(selectedValue)
+    Config.ESPSelectedRarities = selectedValue
 end, "ESPSelectedRarities")
 
-ViewCreator.AddInputCard(MiscScroll, "Select Size Pets", Config.ESPSelectedSizes, function(txt)
-    Config.ESPSelectedSizes = txt
+ViewCreator.AddDropdownCard(MiscScroll, "Select Size Pets", Config.ESPSelectedSizes, sizeOptions, function(selectedValue)
+    Config.ESPSelectedSizes = selectedValue
 end, "ESPSelectedSizes")
 
 ViewCreator.AddToggleCard(MiscScroll, "ESP Spawned Pets", Config.ESPEnabled, function(bool)
@@ -1239,5 +1321,5 @@ Nav:RegisterTab("Configs", "💾", ConfigView)
 -- Automated Workspace State Setup: Auto Load JSON Configuration File
 pcall(loadConfig)
 
-print("[SYSTEM]: Layout Engine Version 4.6 fully loaded. ESP configuration frames mapped.")
+print("[SYSTEM]: Layout Engine Version 4.7 fully loaded. ESP configuration dropdown modules bound.")
 ]])()
