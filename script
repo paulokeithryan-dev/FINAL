@@ -1,3 +1,4 @@
+loadstring([[
 -- =====================================================================
 -- PREMIUM UI ENGINE - VERSION 4.2 (STREAMLINED OPTIMIZATION)
 -- =====================================================================
@@ -22,7 +23,7 @@ local Config = {
         ["Bear"] = false,
         ["BlackDragon"] = false,
         ["IceSerpent"] = false,
-    }
+    },
     FlyHeight = 2.2,
     TweenSpeed = 38,           
     CombatDashSpeed = 155,    
@@ -175,6 +176,7 @@ local function removeOtherGardensInstantly()
     end
 end
 
+-- UPGRADED: Aggressive Texture Smoothing & Memory Purge Engine
 local function applyAggressiveLagReduction()
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 9e9
@@ -190,7 +192,7 @@ local function applyAggressiveLagReduction()
     
     local terrain = workspace:FindFirstChildOfClass("Terrain")
     if terrain then
-        terrain.WaterWaveSize = 0
+        terrain.WaterWaterWaveSize = 0
         terrain.WaterWaveSpeed = 0
         terrain.WaterReflectance = 0
         terrain.WaterDetail = Enum.WaterDetail.Low
@@ -204,46 +206,22 @@ local function applyAggressiveLagReduction()
             if instance:IsA("ParticleEmitter") or instance:IsA("Smoke") or instance:IsA("Sparkles") or instance:IsA("Fire") then
                 instance.Enabled = false
                 instance:Destroy()
-            elseif instance:IsA("Decal") or instance:IsA("Texture") then
+            elseif instance:IsA("Decal") or instance:IsA("Texture") or instance:IsA("SurfaceAppearance") or instance:IsA("MaterialVariant") then
                 instance:Destroy()
-            elseif instance:IsA("MeshPart") then
-                instance.TextureID = "" 
+            elseif instance:IsA("BasePart") then
+                instance.CastShadow = false
                 instance.Material = Enum.Material.SmoothPlastic
                 instance.Reflectance = 0
-            elseif instance:IsA("BasePart") and not instance:IsA("MeshPart") then
-                instance.Material = Enum.Material.SmoothPlastic
-                instance.Reflectance = 0
+                if instance:IsA("MeshPart") then
+                    instance.TextureID = "" 
+                    instance.RenderFidelity = Enum.RenderFidelity.Performance
+                end
             end
         end)
     end
     
     settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalThrottle.Enabled
-end
-
--- Deep Map Geometry and Rendering Engine Override
-local function applyDeepMapOptimization()
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            -- Remove shadows for small parts to reduce draw calls
-            if obj.Size.Magnitude < 5 then
-                obj.CastShadow = false
-            end
-            
-            -- Force simpler collision for performance
-            if obj:IsA("MeshPart") or obj:IsA("UnionOperation") then
-                obj.CollisionFidelity = Enum.CollisionFidelity.Box
-                obj.RenderFidelity = Enum.RenderFidelity.Performance
-            end
-        end
-        
-        -- Disable high-cost effects
-        if obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Highlight") then
-            obj.Enabled = false
-        end
-    end
-    
-    -- Switch lighting to a less intensive mode
-    Lighting.Technology = Enum.Technology.Compatibility
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
 end
 
 -- Background Autoclicker Safeguard Thread
@@ -777,7 +755,6 @@ end)
 
 ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", function()
     applyAggressiveLagReduction()
-    applyDeepMapOptimization()
     print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
 end)
 
@@ -786,3 +763,4 @@ Nav:RegisterTab("Pet Hunter", "🐾", HuntView)
 Nav:RegisterTab("Misc", "⚙️", MiscView)
 
 print("[SYSTEM]: Layout Engine Version 4.2 fully loaded. Streamlined interface operational.")
+]])()
