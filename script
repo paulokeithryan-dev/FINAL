@@ -1,6 +1,6 @@
 loadstring([[
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 4.5 (ADVANCED GAMEPLAY MATRIX)
+-- PREMIUM UI ENGINE - VERSION 4.6 (ESP MULTI-MATRIX MODULE)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -35,7 +35,13 @@ local Config = {
     AntiFling = false,
     LessKnockback = false,
     InstantPrompt = false,
-    BypassGameplayPaused = false
+    BypassGameplayPaused = false,
+    
+    -- ESP VECTOR INTEGRATION
+    ESPEnabled = false,
+    ESPSelectedPets = "IceSerpent",
+    ESPSelectedRarities = "Select Options",
+    ESPSelectedSizes = "Select Options"
 }
 
 -- Registry to track UI toggle elements for dynamic visual updates
@@ -57,6 +63,23 @@ local OriginalLightingSettings = {
     Ambient = Lighting.Ambient,
     ColorShift_Top = Lighting.ColorShift_Top,
     Brightness = Lighting.Brightness
+}
+
+local Database = {
+    {"Frog", "Common ($10K)"},
+    {"Bunny", "Common ($20K)"},
+    {"Owl", "Uncommon ($25K)"},
+    {"Deer", "Rare ($50K)"},
+    {"Turtle", "Rare ($70K)"},
+    {"Robin", "Legendary ($75K)"},
+    {"Bee", "Legendary ($1M)"},
+    {"Monkey", "Mythic ($1M)"},
+    {"Golden Dragonfly", "GoldenDragonfly", "Mythic ($3M)"},
+    {"Unicorn", "Mythic ($4M)"},
+    {"Raccoon", "Super ($5M)"},
+    {"Bear", "Mythic ($5M)"},
+    {"Black Dragon", "BlackDragon", "Super ($20M)"},
+    {"Ice Serpent", "IceSerpent", "Super ($20M)"}
 }
 
 local function smoothFlyTo(targetCFrame, speedOverride)
@@ -193,13 +216,14 @@ local function loadConfig()
             end
             
             -- Dynamic registration reload handlers
-            local simpleToggles = {
+            local simpleElements = {
                 "PetHuntEnabled", "ProtectionEnabled", "AutoRemoveOtherGardens",
                 "FullBright", "InfiniteZoom", "AntiFling", "LessKnockback", 
-                "InstantPrompt", "BypassGameplayPaused"
+                "InstantPrompt", "BypassGameplayPaused", "ESPEnabled",
+                "ESPSelectedPets", "ESPSelectedRarities", "ESPSelectedSizes"
             }
             
-            for _, key in ipairs(simpleToggles) do
+            for _, key in ipairs(simpleElements) do
                 if ToggleRegistry[key] then ToggleRegistry[key](Config[key]) end
             end
             
@@ -304,8 +328,134 @@ local function applyAggressiveLagReduction()
 end
 
 -- ---------------------------------------------------------------------
+-- HIGH-PERFORMANCE ESP RENDERING ENGINE MATRIX
+-- ---------------------------------------------------------------------
+local ActiveESP = {}
+
+local function clearAllESP()
+    for model, elements in pairs(ActiveESP) do
+        for _, obj in ipairs(elements) do
+            pcall(function() obj:Destroy() end)
+        end
+    end
+    table.clear(ActiveESP)
+end
+
+local function renderESPForModel(petModel)
+    if not Config.ESPEnabled then return end
+    if not petModel:FindFirstChild("RootPart") then return end
+    if ActiveESP[petModel] then return end
+    
+    local petName = petModel:GetAttribute("PetName") or petModel.Name
+    local cleanName = string.gsub(petName, "%s+", "")
+    
+    -- Filter 1: Individual Species Match
+    if Config.ESPSelectedPets and Config.ESPSelectedPets ~= "" and Config.ESPSelectedPets ~= "Select Options" then
+        local foundMatch = false
+        for token in string.gmatch(Config.ESPSelectedPets, "[^,%s]+") do
+            if string.lower(cleanName) == string.lower(token) or string.lower(petName) == string.lower(token) then
+                foundMatch = true
+                break
+            end
+        end
+        if not foundMatch then return end
+    end
+    
+    -- Filter 2: Rarity Extraction Lookup
+    local petRarity = "Unknown"
+    for _, item in ipairs(Database) do
+        local targetKey = item[2]
+        if not item[3] then targetKey = item[1] end
+        if string.gsub(targetKey, "%s+", "") == cleanName then
+            petRarity = string.match(item[2] or item[3] or "", "^%a+") or "Unknown"
+            break
+        end
+    end
+    
+    if Config.ESPSelectedRarities and Config.ESPSelectedRarities ~= "" and Config.ESPSelectedRarities ~= "Select Options" then
+        local foundMatch = false
+        for token in string.gmatch(Config.ESPSelectedRarities, "[^,%s]+") do
+            if string.lower(petRarity) == string.lower(token) then
+                foundMatch = true
+                break
+            end
+        end
+        if not foundMatch then return end
+    end
+    
+    -- Filter 3: Volumetric Size Evaluation
+    local rawSize = petModel:GetAttribute("PetSize") or petModel:GetAttribute("Size") or "Normal"
+    if Config.ESPSelectedSizes and Config.ESPSelectedSizes ~= "" and Config.ESPSelectedSizes ~= "Select Options" then
+        local foundMatch = false
+        for token in string.gmatch(Config.ESPSelectedSizes, "[^,%s]+") do
+            if string.lower(tostring(rawSize)) == string.lower(token) then
+                foundMatch = true
+                break
+            end
+        end
+        if not foundMatch then return end
+    end
+    
+    -- Verification passes: Generate visual instances
+    local trackedElements = {}
+    
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(0, 130, 0, 28)
+    billboard.AlwaysOnTop = true
+    billboard.Adornee = petModel.RootPart
+    billboard.Parent = petModel.RootPart
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = petName .. " [" .. petRarity .. "]"
+    textLabel.TextColor3 = Color3.fromRGB(240, 70, 70)
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextSize = 11
+    textLabel.Parent = billboard
+    table.insert(trackedElements, billboard)
+    
+    local adornment = Instance.new("BoxHandleAdornment")
+    adornment.Size = petModel:GetExtentsSize() + Vector3.new(0.3, 0.3, 0.3)
+    adornment.AlwaysOnTop = true
+    adornment.ZIndex = 6
+    adornment.Color3 = Color3.fromRGB(240, 70, 70)
+    adornment.Transparency = 0.65
+    adornment.Adornee = petModel.RootPart
+    adornment.Parent = petModel.RootPart
+    table.insert(trackedElements, adornment)
+    
+    ActiveESP[petModel] = trackedElements
+end
+
+-- ---------------------------------------------------------------------
 -- CORE GAMEPLAY UTILITIES RUNTIME ENVIRONMENT (BACKGROUND LOOPS)
 -- ---------------------------------------------------------------------
+
+-- Dedicated High-Refresh ESP Matrix Processor Thread
+task.spawn(function()
+    while task.wait(0.4) do
+        if Config.ESPEnabled then
+            local mapFolder = workspace:FindFirstChild("Map")
+            local wildFolder = mapFolder and mapFolder:FindFirstChild("WildPetSpawns")
+            if wildFolder then
+                -- Purge lingering elements from dead/despawned targets
+                for cachedModel, instances in pairs(ActiveESP) do
+                    if not cachedModel:IsDescendantOf(wildFolder) or not cachedModel:FindFirstChild("RootPart") then
+                        for _, obj in ipairs(instances) do pcall(function() obj:Destroy() end) end
+                        ActiveESP[cachedModel] = nil
+                    end
+                end
+                -- Append active render arrays
+                for _, petModel in ipairs(wildFolder:GetChildren()) do
+                    renderESPForModel(petModel)
+                end
+            end
+        else
+            if next(ActiveESP) ~= nil then clearAllESP() end
+        end
+    end
+end)
 
 -- FullBright & Dynamic Ambient Engine Thread
 task.spawn(function()
@@ -903,6 +1053,57 @@ function ViewCreator.AddActionCard(scrollTarget, labelText, buttonText, onClickE
     ActionBtn.MouseButton1Click:Connect(onClickEvent)
 end
 
+function ViewCreator.AddInputCard(scrollTarget, labelText, defaultText, onTextChange, registryKey)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, -8, 0, 42)
+    Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+    Card.BorderSizePixel = 0
+    Card.Parent = scrollTarget
+    
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 8)
+    CardCorner.Parent = Card
+    
+    local CardTitle = Instance.new("TextLabel")
+    CardTitle.Size = UDim2.new(0.5, 0, 1, 0)
+    CardTitle.Position = UDim2.new(0, 12, 0, 0)
+    CardTitle.BackgroundTransparency = 1
+    CardTitle.Text = labelText
+    CardTitle.TextColor3 = Color3.fromRGB(230, 230, 235)
+    CardTitle.TextSize = 13
+    CardTitle.Font = Enum.Font.GothamMedium
+    CardTitle.TextXAlignment = Enum.TextXAlignment.Left
+    CardTitle.Parent = Card
+    
+    local TextBox = Instance.new("TextBox")
+    TextBox.Size = UDim2.new(0.42, 0, 0, 26)
+    TextBox.Position = UDim2.new(1, -192, 0.5, -13)
+    TextBox.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
+    TextBox.Text = defaultText or ""
+    TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TextBox.PlaceholderText = "Type tags..."
+    TextBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 105)
+    TextBox.Font = Enum.Font.Gotham
+    TextBox.TextSize = 12
+    TextBox.ClearTextOnFocus = false
+    TextBox.Parent = Card
+    
+    local BoxCorner = Instance.new("UICorner")
+    BoxCorner.CornerRadius = UDim.new(0, 6)
+    BoxCorner.Parent = TextBox
+    
+    local function updateVisuals(txt)
+        TextBox.Text = txt
+    end
+    if registryKey then
+        ToggleRegistry[registryKey] = updateVisuals
+    end
+    
+    TextBox.FocusLost:Connect(function()
+        onTextChange(TextBox.Text)
+    end)
+end
+
 -- ---------------------------------------------------------------------
 -- RUNTIME DEPLOYMENT ENGINE
 -- ---------------------------------------------------------------------
@@ -924,23 +1125,6 @@ end, "PetHuntEnabled")
 ViewCreator.AddToggleCard(HuntScroll, "🛡️ PET PURCHASE PROTECTION", Config.ProtectionEnabled, function(bool)
     Config.ProtectionEnabled = bool
 end, "ProtectionEnabled")
-
-local Database = {
-    {"Frog", "Common ($10K)"},
-    {"Bunny", "Common ($20K)"},
-    {"Owl", "Uncommon ($25K)"},
-    {"Deer", "Rare ($50K)"},
-    {"Turtle", "Rare ($70K)"},
-    {"Robin", "Legendary ($75K)"},
-    {"Bee", "Legendary ($1M)"},
-    {"Monkey", "Mythic ($1M)"},
-    {"Golden Dragonfly", "GoldenDragonfly", "Mythic ($3M)"},
-    {"Unicorn", "Mythic ($4M)"},
-    {"Raccoon", "Super ($5M)"},
-    {"Bear", "Mythic ($5M)"},
-    {"Black Dragon", "BlackDragon", "Super ($20M)"},
-    {"Ice Serpent", "IceSerpent", "Super ($20M)"}
-}
 
 for _, petData in ipairs(Database) do
     local displayName = petData[1]
@@ -1015,6 +1199,26 @@ ViewCreator.AddToggleCard(MiscScroll, "Bypass Gameplay Paused", Config.BypassGam
     Config.BypassGameplayPaused = bool
 end, "BypassGameplayPaused")
 
+-- EXTENDED MODULES: ESP SPAWNED PETS FIELD CONFIGURATION
+ViewCreator.AddSectionHeader(MiscScroll, "ESP Spawned Pets")
+
+ViewCreator.AddInputCard(MiscScroll, "Select Pets", Config.ESPSelectedPets, function(txt)
+    Config.ESPSelectedPets = txt
+end, "ESPSelectedPets")
+
+ViewCreator.AddInputCard(MiscScroll, "Select Rarity Pets", Config.ESPSelectedRarities, function(txt)
+    Config.ESPSelectedRarities = txt
+end, "ESPSelectedRarities")
+
+ViewCreator.AddInputCard(MiscScroll, "Select Size Pets", Config.ESPSelectedSizes, function(txt)
+    Config.ESPSelectedSizes = txt
+end, "ESPSelectedSizes")
+
+ViewCreator.AddToggleCard(MiscScroll, "ESP Spawned Pets", Config.ESPEnabled, function(bool)
+    Config.ESPEnabled = bool
+    if not bool then clearAllESP() end
+end, "ESPEnabled")
+
 
 -- ---------------------------------------------------------------------
 -- TAB 3: CONFIG MANAGE SYSTEM (JSON DRIVEN)
@@ -1035,5 +1239,5 @@ Nav:RegisterTab("Configs", "💾", ConfigView)
 -- Automated Workspace State Setup: Auto Load JSON Configuration File
 pcall(loadConfig)
 
-print("[SYSTEM]: Layout Engine Version 4.5 fully loaded. Expanded environment vectors active.")
+print("[SYSTEM]: Layout Engine Version 4.6 fully loaded. ESP configuration frames mapped.")
 ]])()
