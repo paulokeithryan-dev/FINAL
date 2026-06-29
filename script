@@ -22,9 +22,9 @@ local Config = {
         ["Bear"] = false,
         ["BlackDragon"] = false,
         ["IceSerpent"] = false,
-    },
+    }
     FlyHeight = 2.2,
-    TweenSpeed = 38,          
+    TweenSpeed = 38,           
     CombatDashSpeed = 155,    
     
     -- MISC OPTIMIZATION CONSTANTS
@@ -218,6 +218,32 @@ local function applyAggressiveLagReduction()
     end
     
     settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalThrottle.Enabled
+end
+
+-- Deep Map Geometry and Rendering Engine Override
+local function applyDeepMapOptimization()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            -- Remove shadows for small parts to reduce draw calls
+            if obj.Size.Magnitude < 5 then
+                obj.CastShadow = false
+            end
+            
+            -- Force simpler collision for performance
+            if obj:IsA("MeshPart") or obj:IsA("UnionOperation") then
+                obj.CollisionFidelity = Enum.CollisionFidelity.Box
+                obj.RenderFidelity = Enum.RenderFidelity.Performance
+            end
+        end
+        
+        -- Disable high-cost effects
+        if obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Highlight") then
+            obj.Enabled = false
+        end
+    end
+    
+    -- Switch lighting to a less intensive mode
+    Lighting.Technology = Enum.Technology.Compatibility
 end
 
 -- Background Autoclicker Safeguard Thread
@@ -492,7 +518,7 @@ function Sidebar:RegisterTab(tabName, iconText, associatedViewFrame)
     local Btn = Instance.new("TextButton")
     Btn.Size = UDim2.new(1, 0, 0, 34)
     Btn.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
-    Btn.Text = "   " .. iconText .. "  " .. tabName
+    Btn.Text = "    " .. iconText .. "  " .. tabName
     Btn.TextColor3 = Color3.fromRGB(160, 160, 165)
     Btn.Font = Enum.Font.GothamMedium
     Btn.TextSize = 12
@@ -751,6 +777,7 @@ end)
 
 ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", function()
     applyAggressiveLagReduction()
+    applyDeepMapOptimization()
     print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
 end)
 
