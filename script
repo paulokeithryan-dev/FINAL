@@ -1,6 +1,6 @@
 loadstring([[
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 4.7 (ESP MULTI-MATRIX MODULE + DROPDOWNS)
+-- PREMIUM UI ENGINE - VERSION 4.8 (MULTI-SELECT DRIVEN MATRIX)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -1053,6 +1053,7 @@ function ViewCreator.AddActionCard(scrollTarget, labelText, buttonText, onClickE
     ActionBtn.MouseButton1Click:Connect(onClickEvent)
 end
 
+-- UPGRADED: PRE-COMPILED MULTI-SELECT DROPDOWN SYSTEM WITH RE-ALIGNMENT HOOKS
 function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optionsList, onSelect, registryKey)
     local Card = Instance.new("Frame")
     Card.Size = UDim2.new(1, -8, 0, 42)
@@ -1083,13 +1084,13 @@ function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optio
     DropdownBtn.TextColor3 = Color3.fromRGB(220, 220, 225)
     DropdownBtn.Font = Enum.Font.Gotham
     DropdownBtn.TextSize = 12
+    DropdownBtn.TextTruncate = Enum.TextTruncate.AtEnd
     DropdownBtn.Parent = Card
     
     local BtnCorner = Instance.new("UICorner")
     BtnCorner.CornerRadius = UDim.new(0, 6)
     BtnCorner.Parent = DropdownBtn
     
-    -- Overlay Container Layer (Parented directly to ScreenGui context to avoid scrolling frame canvas limits)
     local DropdownList = Instance.new("ScrollingFrame")
     DropdownList.Size = UDim2.new(0, 180, 0, 120)
     DropdownList.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
@@ -1127,7 +1128,7 @@ function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optio
         isOpen = not isOpen
         if isOpen then
             DropdownList.Position = UDim2.new(0, DropdownBtn.AbsolutePosition.X, 0, DropdownBtn.AbsolutePosition.Y + DropdownBtn.AbsoluteSize.Y + 3)
-            DropdownList.Size = UDim2.new(0, DropdownBtn.AbsoluteSize.X, 0, math.min(#optionsList * 26 + 4, 130))
+            DropdownList.Size = UDim2.new(0, DropdownBtn.AbsoluteSize.X, 0, math.min(#optionsList * 26 + 4, 150))
             DropdownList.Visible = true
         else
             DropdownList.Visible = false
@@ -1135,28 +1136,64 @@ function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optio
     end
     
     DropdownBtn.MouseButton1Click:Connect(toggleDropdown)
-    
-    -- Absolute tracking synchronization engine link
     DropdownBtn:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
         if isOpen then
             DropdownList.Position = UDim2.new(0, DropdownBtn.AbsolutePosition.X, 0, DropdownBtn.AbsolutePosition.Y + DropdownBtn.AbsoluteSize.Y + 3)
         end
     end)
     
-    local function updateVisuals(txt)
-        DropdownBtn.Text = txt
+    -- MULTI-SELECT MATRIX INITIALIZATION
+    local activeSelections = {}
+    
+    local function parseInitialState(txt)
+        table.clear(activeSelections)
+        if txt and txt ~= "Select Options" and txt ~= "None" and txt ~= "" then
+            for token in string.gmatch(txt, "[^,%s]+") do
+                activeSelections[token] = true
+            end
+        end
     end
-    if registryKey then
-        ToggleRegistry[registryKey] = updateVisuals
+    
+    parseInitialState(defaultText)
+    
+    local optionVisualUpdaters = {}
+    
+    local function updateMainButtonText()
+        local count = 0
+        local names = {}
+        for name, _ in pairs(activeSelections) do
+            table.insert(names, name)
+            count = count + 1
+        end
+        
+        local finalString = ""
+        if count == 0 then
+            finalString = "Select Options"
+            DropdownBtn.Text = finalString
+        elseif count == 1 then
+            finalString = names[1]
+            DropdownBtn.Text = finalString
+        else
+            finalString = table.concat(names, ", ")
+            DropdownBtn.Text = count .. " Selected"
+        end
+        
+        onSelect(finalString)
     end
+    
+    local function externalUpdateHandler(txt)
+        parseInitialState(txt)
+        for _, updater in pairs(optionVisualUpdaters) do updater() end
+        updateMainButtonText()
+    end
+    
+    if registryKey then ToggleRegistry[registryKey] = externalUpdateHandler end
     
     for i, option in ipairs(optionsList) do
         local OptBtn = Instance.new("TextButton")
         OptBtn.Size = UDim2.new(1, 0, 0, 26)
         OptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
         OptBtn.BorderSizePixel = 0
-        OptBtn.Text = "   " .. option
-        OptBtn.TextColor3 = Color3.fromRGB(190, 190, 195)
         OptBtn.Font = Enum.Font.Gotham
         OptBtn.TextSize = 12
         OptBtn.TextXAlignment = Enum.TextXAlignment.Left
@@ -1164,22 +1201,38 @@ function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optio
         OptBtn.ZIndex = 5001
         OptBtn.Parent = DropdownList
         
-        OptBtn.MouseEnter:Connect(function()
-            OptBtn.BackgroundColor3 = Color3.fromRGB(38, 38, 44)
-            OptBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        end)
-        OptBtn.MouseLeave:Connect(function()
-            OptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
-            OptBtn.TextColor3 = Color3.fromRGB(190, 190, 195)
-        end)
+        optionVisualUpdaters[option] = function()
+            if activeSelections[option] then
+                OptBtn.Text = "  ✓  " .. option
+                OptBtn.TextColor3 = Color3.fromRGB(100, 255, 150)
+            else
+                OptBtn.Text = "      " .. option
+                OptBtn.TextColor3 = Color3.fromRGB(190, 190, 195)
+            end
+        end
+        optionVisualUpdaters[option]()
+        
+        OptBtn.MouseEnter:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(38, 38, 44) end)
+        OptBtn.MouseLeave:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32) end)
         
         OptBtn.MouseButton1Click:Connect(function()
-            updateVisuals(option)
-            onSelect(option)
-            isOpen = false
-            DropdownList.Visible = false
+            if option == "None" then
+                table.clear(activeSelections)
+            else
+                activeSelections["None"] = nil
+                if activeSelections[option] then
+                    activeSelections[option] = nil
+                else
+                    activeSelections[option] = true
+                end
+            end
+            
+            for _, updater in pairs(optionVisualUpdaters) do updater() end
+            updateMainButtonText()
         end)
     end
+    
+    updateMainButtonText()
 end
 
 -- ---------------------------------------------------------------------
@@ -1235,7 +1288,7 @@ ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", f
     print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
 end)
 
--- INTEGRATED NEW UTILITIES MODULE
+-- INTEGRATED UTILITIES MODULE
 ViewCreator.AddSectionHeader(MiscScroll, "Environment")
 
 ViewCreator.AddToggleCard(MiscScroll, "Full Bright", Config.FullBright, function(bool)
@@ -1321,5 +1374,5 @@ Nav:RegisterTab("Configs", "💾", ConfigView)
 -- Automated Workspace State Setup: Auto Load JSON Configuration File
 pcall(loadConfig)
 
-print("[SYSTEM]: Layout Engine Version 4.7 fully loaded. ESP configuration dropdown modules bound.")
+print("[SYSTEM]: Layout Engine Version 4.8 fully loaded. Multi-select filtering matrix compiled.")
 ]])()
