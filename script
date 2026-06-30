@@ -496,350 +496,95 @@ local function applyAggressiveLagReduction()
     pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
 end
 
--- ---------------------------------------------------------------------
--- HIGH-PERFORMANCE ESP RENDERING ENGINE MATRIX
--- ---------------------------------------------------------------------
-local ActiveESP = {}
-
-local function clearAllESP()
-    for model, elements in pairs(ActiveESP) do
-        for _, obj in ipairs(elements) do
-            pcall(function() obj:Destroy() end)
-        end
-    end
-    table.clear(ActiveESP)
-end
-
-local function renderESPForModel(petModel)
-    if not Config.ESPEnabled then return end
-    if not petModel:FindFirstChild("RootPart") then return end
-    if ActiveESP[petModel] then return end
-    
-    local petName = petModel:GetAttribute("PetName") or petModel.Name
-    local cleanName = string.gsub(petName, "%s+", "")
-    
-    if next(ESPCache.Pets) then
-        if not ESPCache.Pets[string.lower(cleanName)] and not ESPCache.Pets[string.lower(string.gsub(petName, "%s+", ""))] then 
-            return 
-        end
-    end
-    
-    local petRarity = "Unknown"
-    for _, item in ipairs(Database) do
-        local targetKey = item[2]
-        if not item[3] then targetKey = item[1] end
-        if string.gsub(targetKey, "%s+", "") == cleanName then
-            petRarity = string.match(item[2] or item[3] or "", "^%a+") or "Unknown"
-            break
-        end
-    end
-    
-    if next(ESPCache.Rarities) then
-        if not ESPCache.Rarities[string.lower(petRarity)] then 
-            return 
-        end
-    end
-    
-    local rawSize = petModel:GetAttribute("PetSize") or petModel:GetAttribute("Size") or "Normal"
-    if next(ESPCache.Sizes) then
-        if not ESPCache.Sizes[string.lower(tostring(rawSize))] then 
-            return 
-        end
-    end
-    
-    local chosenHex = RarityHexColors[petRarity] or "#FFFFFF"
-    local trackedElements = {}
-    
-    local billboard = Instance.new("BillboardGui")
-    billboard.Size = UDim2.new(0, 160, 0, 30)
-    billboard.AlwaysOnTop = true
-    billboard.Adornee = petModel.RootPart
-    billboard.Parent = petModel.RootPart
-    
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, 0, 1, 0)
-    textLabel.BackgroundTransparency = 1
-    textLabel.RichText = true
-    textLabel.Text = string.format("<font color=\"%s\">%s</font> <font color=\"%s\">[%s]</font>", "#FFFFFF", petName, chosenHex, petRarity)
-    textLabel.Font = Enum.Font.GothamBold
-    textLabel.TextSize = 12
-    textLabel.TextStrokeTransparency = 0.4
-    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    textLabel.Parent = billboard
-    table.insert(trackedElements, billboard)
-    
-    ActiveESP[petModel] = trackedElements
-end
-
--- Helper: Standardizes Countdown Outputs for UI Displays
-local function formatPredictionTime(seconds)
-    if seconds <= 0 then return "0s" end
-    local days = math.floor(seconds / 86400)
-    local hours = math.floor((seconds % 86400) / 3600)
-    local minutes = math.floor((seconds % 3600) / 60)
-    local secs = math.floor(seconds % 60)
-    
-    local parts = {}
-    if days > 0 then table.insert(parts, string.format("%dd", days)) end
-    if hours > 0 or days > 0 then table.insert(parts, string.format("%dh", hours)) end
-    if minutes > 0 or hours > 0 or days > 0 then table.insert(parts, string.format("%dm", minutes)) end
-    table.insert(parts, string.format("%ds", secs))
-    return table.concat(parts, " ")
-end
-
--- ---------------------------------------------------------------------
--- CORE GAMEPLAY UTILITIES RUNTIME ENVIRONMENT (BACKGROUND LOOPS)
--- ---------------------------------------------------------------------
-
+-- =====================================================================
+-- HIGH PERFORMANCE LIVE UPDATES DISPLAY & CONTINUOUS PREDICTIONS ENGINE
+-- =====================================================================
 task.spawn(function()
-    while task.wait(0.4) do
-        if Config.ESPEnabled then
-            local mapFolder = workspace:FindFirstChild("Map")
-            local wildFolder = mapFolder and mapFolder:FindFirstChild("WildPetSpawns")
-            if wildFolder then
-                for cachedModel, instances in pairs(ActiveESP) do
-                    if not cachedModel:IsDescendantOf(wildFolder) or not cachedModel:FindFirstChild("RootPart") then
-                        for _, obj in ipairs(instances) do pcall(function() obj:Destroy() end) end
-                        ActiveESP[cachedModel] = nil
-                    end
-                end
-                for _, petModel in ipairs(wildFolder:GetChildren()) do
-                    renderESPForModel(petModel)
-                end
-            end
-        else
-            if next(ActiveESP) ~= nil then clearAllESP() end
-        end
-    end
-end)
+    -- Standard restock cycle intervals (used to automatically loop predictions when timers hit zero)
+    local SEED_CYCLE_DURATION = 43200 -- 12 Hour Cycle Fallback
+    local GEAR_CYCLE_DURATION = 7200  -- 2 Hour Cycle Fallback
 
-task.spawn(function()
-    while task.wait(1) do
-        if Config.FullBright then
-            pcall(function()
-                Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-                Lighting.ColorShift_Top = Color3.fromRGB(255, 255, 255)
-                Lighting.Brightness = 2
-            end)
-        end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.5) do
-        pcall(function()
-            if LocalPlayer then
-                LocalPlayer.CameraMaxZoomDistance = Config.InfiniteZoom and 9e9 or 400
-            end
-        end)
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.1) do
-        if Config.AntiFling then
-            pcall(function()
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer and player.Character then
-                        for _, part in ipairs(player.Character:GetChildren()) do
-                            if part:IsA("BasePart") then
-                                part.CanCollide = false
-                                part.Velocity = Vector3.zero
-                                part.RotVelocity = Vector3.zero
-                            end
-                        end
-                    end
-                end
-            end)
-        end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.05) do
-        if Config.LessKnockback and LocalPlayer.Character then
-            pcall(function()
-                for _, child in ipairs(LocalPlayer.Character:GetDescendants()) do
-                    if child:IsA("BodyVelocity") or child:IsA("LinearVelocity") or child:IsA("BodyForce") then
-                        child:Destroy()
-                    end
-                end
-                local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if root and root.Velocity.Magnitude > 65 then
-                    root.Velocity = root.Velocity.Unit * 15
-                end
-            end)
-        end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.5) do
-        if Config.InstantPrompt then
-            pcall(function()
-                for _, prompt in ipairs(workspace:GetDescendants()) do
-                    if prompt:IsA("ProximityPrompt") then
-                        prompt.HoldDuration = 0
-                    end
-                end
-            end)
-        end
-    end
-end)
-
-workspace.DescendantAdded:Connect(function(descendant)
-    if Config.InstantPrompt and descendant:IsA("ProximityPrompt") then
-        pcall(function() descendant.HoldDuration = 0 end)
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.5) do
-        pcall(function()
-            GuiService:SetGameplayPausedNotificationEnabled(not Config.BypassGameplayPaused)
-            if Config.BypassGameplayPaused then
-                local pGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-                if pGui then
-                    for _, node in ipairs(pGui:GetDescendants()) do
-                        if node:IsA("TextLabel") and (string.find(node.Text:lower(), "gameplay paused") or string.find(node.Text:lower(), "pausing")) then
-                            local rootWindow = node.Parent
-                            if rootWindow and rootWindow:IsA("Frame") then
-                                rootWindow.Visible = false
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.02) do 
-        if Config.ProtectionEnabled and Config.PetHuntEnabled then
-            local character = LocalPlayer.Character
-            local shovel = character and character:FindFirstChild("Shovel")
-            local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-            
-            if shovel and rootPart then
-                local playerNearby = false
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                        local dist = (player.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude
-                        if dist <= (Config.ProtectionRadius + 5) then
-                            playerNearby = true
-                            break
-                        end
-                    end
-                end
-                if playerNearby then
-                    executeDualActionStrike(shovel)
-                end
-            end
-        end
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.2) do
-        if Config.SkipLoadingScreen then
-            pcall(function()
-                local camera = workspace.CurrentCamera
-                if camera and camera.CameraType == Enum.CameraType.Scriptable then
-                    local isTrapped = false
-                    local searchRoot = workspace:FindFirstChild("Gardens")
-                    if searchRoot then
-                        for _, item in ipairs(searchRoot:GetDescendants()) do
-                            if (item.Name == "LoadingScreenCam" or item.Name == "LoadingCam") and item:IsA("BasePart") then
-                                if (camera.CFrame.Position - item.Position).Magnitude < 10 then
-                                    isTrapped = true
-                                    break
-                                end
-                            end
-                        end
-                    end
-                    if isTrapped then
-                        camera.CameraType = Enum.CameraType.Custom
-                        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                        if hum then camera.CameraSubject = hum end
-                    end
-                end
-
-                local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-                if playerGui then
-                    for _, element in ipairs(playerGui:GetChildren()) do
-                        if element:IsA("ScreenGui") and element.Enabled then
-                            local nameLower = string.lower(element.Name)
-                            if string.find(nameLower, "loading") or string.find(nameLower, "intro") or string.find(nameLower, "transition") then
-                                element.Enabled = false
-                            end
-                        end
-                    end
-                end
-            end)
-        end
-    end
-end)
-
--- HIGH PERFORMANCE LIVE UPDATES DISPLAY & WINDOW ALERTS SCANNER
-task.spawn(function()
     while task.wait(1) do
         local currentTime = os.time()
         
-        -- Process Seed Stock Countdown Items (image_72d6d7.png Layout Match)
+        -- -------------------------------------------------------------
+        -- PROCESS SEED STOCK COUNTDOWN MATRIX
+        -- -------------------------------------------------------------
         if Config.SeedStockPredictions and ToggleRegistry["SeedStockDisplayLabel"] then
             local seedLines = {}
             for name, timestamp in pairs(ActivePredictionTimestamps.Seeds) do
                 local timeRemaining = timestamp - currentTime
-                if timeRemaining > 0 then
-                    table.insert(seedLines, string.format("%s: %s", name, formatPredictionTime(timeRemaining)))
-                    
-                    -- Evaluate Window Notification Criteria (5-10 Minutes Alerts Gate)
-                    if Config.NotificationStockSeed and not IgnoredSeedsCache[name] then
-                        if timeRemaining >= 300 and timeRemaining <= 600 then
-                            if not DispatchedNotificationsLog[name] then
-                                DispatchedNotificationsLog[name] = true
-                                pcall(function()
-                                    StarterGui:SetCore("SendNotification", {
-                                        Title = "Seed Stock Warning",
-                                        Text = string.format("%s is restocking in %s!", name, formatPredictionTime(timeRemaining)),
-                                        Duration = 7
-                                    })
-                                end)
-                            end
-                        elseif timeRemaining < 300 or timeRemaining > 600 then
-                            DispatchedNotificationsLog[name] = nil
+                
+                -- Auto-Recycle Loop: If stock timer expires, calculate and apply the next cycle timestamp
+                if timeRemaining <= 0 then
+                    local passedCycles = math.floor(math.abs(timeRemaining) / SEED_CYCLE_DURATION) + 1
+                    ActivePredictionTimestamps.Seeds[name] = timestamp + (passedCycles * SEED_CYCLE_DURATION)
+                    timeRemaining = ActivePredictionTimestamps.Seeds[name] - currentTime
+                    DispatchedNotificationsLog[name] = nil -- Reset notification dispatch gate for the new cycle
+                end
+                
+                table.insert(seedLines, string.format("%s: %s", name, formatPredictionTime(timeRemaining)))
+                
+                -- Evaluate Window Notification Criteria (5-10 Minutes Alerts Gate)
+                if Config.NotificationStockSeed and not IgnoredSeedsCache[name] then
+                    if timeRemaining >= 300 and timeRemaining <= 600 then
+                        if not DispatchedNotificationsLog[name] then
+                            DispatchedNotificationsLog[name] = true
+                            pcall(function()
+                                StarterGui:SetCore("SendNotification", {
+                                    Title = "Seed Stock Warning",
+                                    Text = string.format("%s is restocking in %s!", name, formatPredictionTime(timeRemaining)),
+                                    Duration = 7
+                                })
+                            end)
                         end
+                    elseif timeRemaining < 300 and DispatchedNotificationsLog[name] then
+                        -- Keep gate locked until countdown completely resets to avoid repeated alerts
+                        continue
+                    elseif timeRemaining > 600 then
+                        DispatchedNotificationsLog[name] = nil
                     end
                 end
             end
             ToggleRegistry["SeedStockDisplayLabel"](#seedLines > 0 and table.concat(seedLines, "\n") or "No active seed streams loaded.")
         end
 
-        -- Process Gear Stock Countdown Items (image_72d6f8.png Layout Match)
+        -- -------------------------------------------------------------
+        -- PROCESS GEAR STOCK COUNTDOWN MATRIX
+        -- -------------------------------------------------------------
         if Config.GearStockPredictions and ToggleRegistry["GearStockDisplayLabel"] then
             local gearLines = {}
             for name, timestamp in pairs(ActivePredictionTimestamps.Gears) do
                 local timeRemaining = timestamp - currentTime
-                if timeRemaining > 0 then
-                    table.insert(gearLines, string.format("%s: %s", name, formatPredictionTime(timeRemaining)))
-                    
-                    -- Evaluate Window Notification Criteria (5-10 Minutes Alerts Gate)
-                    if Config.NotificationStockGear and not IgnoredGearsCache[name] then
-                        if timeRemaining >= 300 and timeRemaining <= 600 then
-                            if not DispatchedNotificationsLog[name] then
-                                DispatchedNotificationsLog[name] = true
-                                pcall(function()
-                                    StarterGui:SetCore("SendNotification", {
-                                        Title = "Gear Stock Warning",
-                                        Text = string.format("%s is restocking in %s!", name, formatPredictionTime(timeRemaining)),
-                                        Duration = 7
-                                    })
-                                end)
-                            end
-                        elseif timeRemaining < 300 or timeRemaining > 600 then
-                            DispatchedNotificationsLog[name] = nil
+                
+                -- Auto-Recycle Loop: If stock timer expires, calculate and apply the next cycle timestamp
+                if timeRemaining <= 0 then
+                    local passedCycles = math.floor(math.abs(timeRemaining) / GEAR_CYCLE_DURATION) + 1
+                    ActivePredictionTimestamps.Gears[name] = timestamp + (passedCycles * GEAR_CYCLE_DURATION)
+                    timeRemaining = ActivePredictionTimestamps.Gears[name] - currentTime
+                    DispatchedNotificationsLog[name] = nil -- Reset notification dispatch gate for the new cycle
+                end
+                
+                table.insert(gearLines, string.format("%s: %s", name, formatPredictionTime(timeRemaining)))
+                
+                -- Evaluate Window Notification Criteria (5-10 Minutes Alerts Gate)
+                if Config.NotificationStockGear and not IgnoredGearsCache[name] then
+                    if timeRemaining >= 300 and timeRemaining <= 600 then
+                        if not DispatchedNotificationsLog[name] then
+                            DispatchedNotificationsLog[name] = true
+                            pcall(function()
+                                StarterGui:SetCore("SendNotification", {
+                                    Title = "Gear Stock Warning",
+                                    Text = string.format("%s is restocking in %s!", name, formatPredictionTime(timeRemaining)),
+                                    Duration = 7
+                                })
+                            end)
                         end
+                    elseif timeRemaining < 300 and DispatchedNotificationsLog[name] then
+                        -- Keep gate locked until countdown completely resets to avoid repeated alerts
+                        continue
+                    elseif timeRemaining > 600 then
+                        DispatchedNotificationsLog[name] = nil
                     end
                 end
             end
