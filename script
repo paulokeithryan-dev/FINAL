@@ -34,6 +34,11 @@ local Config = {
     TweenSpeed = 38,           
     CombatDashSpeed = 155,    
     
+    -- SHOP SETTINGS
+    SelectedSeed = "Bamboo",
+    AutoBuySeeds = false,
+    BuyAmount = 1,
+
     -- MISC OPTIMIZATION & ADVANCED CONTROLS
     AutoRemoveOtherGardens = false,
     FullBright = false,
@@ -225,6 +230,40 @@ local function deployPurchaseInterception(activeTarget, rootPart)
 end
 
 -- ---------------------------------------------------------------------
+-- DEDICATED SEEDS & TRANSACTION PURCHASING SYSTEM
+-- ---------------------------------------------------------------------
+local function executeSeedPurchase(seedName, amount)
+    amount = amount or 1
+    local remotes = game:GetService("ReplicatedStorage")
+    
+    -- Dynamically resolve active Shop transaction pathways
+    local targetRemote = remotes:FindFirstChild("BuySeed") or remotes:FindFirstChild("PurchaseSeed") or remotes:FindFirstChild("SeedShop")
+    if not targetRemote then
+        for _, child in ipairs(remotes:GetDescendants()) do
+            if child:IsA("RemoteEvent") and (string.find(child.Name:lower(), "buyseed") or string.find(child.Name:lower(), "purchaseseed")) then
+                targetRemote = child
+                break
+            end
+        end
+    end
+
+    if targetRemote then
+        for i = 1, amount do
+            targetRemote:FireServer(seedName)
+        end
+    else
+        -- Native UI Button Click fallback interpreter loop
+        pcall(function()
+            local teleportButtons = LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("TeleportButtons", true)
+            local seedsButton = teleportButtons and teleportButtons:FindFirstChild("SeedsButton", true)
+            if seedsButton and typeof(firesignal) == "function" then
+                firesignal(seedsButton.MouseButton1Click)
+            end
+        end)
+    end
+end
+
+-- ---------------------------------------------------------------------
 -- DEDICATED PET FINDER: PUBLIC ROOM ROTATION ENGINE
 -- ---------------------------------------------------------------------
 local function rotateServerInstance()
@@ -331,7 +370,8 @@ local function loadConfig()
                 "FullBright", "InfiniteZoom", "AntiFling", "LessKnockback", 
                 "InstantPrompt", "BypassGameplayPaused", "ESPEnabled",
                 "ESPSelectedPets", "ESPSelectedRarities", "ESPSelectedSizes",
-                "TeleportMode", "ServerHopEnabled", "MaxServerPlayers", "SkipLoadingScreen"
+                "TeleportMode", "ServerHopEnabled", "MaxServerPlayers", "SkipLoadingScreen",
+                "SelectedSeed", "AutoBuySeeds", "BuyAmount"
             }
             
             for _, key in ipairs(simpleElements) do
@@ -532,6 +572,17 @@ end
 -- ---------------------------------------------------------------------
 -- CORE GAMEPLAY UTILITIES RUNTIME ENVIRONMENT (BACKGROUND LOOPS)
 -- ---------------------------------------------------------------------
+
+-- Background Auto-Buy Seeds Worker Engine Thread
+task.spawn(function()
+    while task.wait(0.6) do
+        if Config.AutoBuySeeds and Config.SelectedSeed then
+            pcall(function()
+                executeSeedPurchase(Config.SelectedSeed, Config.BuyAmount or 1)
+            end)
+        end
+    end
+end)
 
 -- Dedicated High-Refresh ESP Matrix Processor Thread
 task.spawn(function()
@@ -928,7 +979,7 @@ function BaseLayout.new()
     self.MainWindow.BackgroundColor3 = Color3.fromRGB(24, 24, 26)
     self.MainWindow.BorderSizePixel = 0
     self.MainWindow.Active = true
-    self.MainWindow.Draggable = false -- FIXED: Terminated buggy native dragging that causes scrolling drift
+    self.MainWindow.Draggable = false
     self.MainWindow.Parent = self.ScreenGui
     
     local MainCorner = Instance.new("UICorner")
@@ -958,7 +1009,7 @@ function BaseLayout.new()
     self.ViewContainer.BackgroundTransparency = 1
     self.ViewContainer.Parent = self.MainWindow
 
-    -- FIX: Native Dragging Interceptor System (Locks window firmly unless background area is dragged)
+    -- FIX: Native Dragging Interceptor System
     local UserInputService = game:GetService("UserInputService")
     local dragging = false
     local dragInput, dragStart, startPos
@@ -973,11 +1024,10 @@ function BaseLayout.new()
             if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
                 if UserInputService:GetFocusedTextBox() then return end
                 
-                -- Verify the click did not start inside scrolling options or action cards
                 local clickElements = targetParent:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
                 for _, obj in ipairs(clickElements) do
                     if obj:IsDescendantOf(self.ViewContainer) or obj:IsA("ScrollingFrame") or obj:IsA("TextButton") then
-                        return -- Absorb input, reject drag initialization
+                        return 
                     end
                 end
 
@@ -1190,7 +1240,7 @@ function ViewCreator.SetupCanvas(titleName, viewContainer)
     Scroll.BorderSizePixel = 0
     Scroll.ScrollBarThickness = 4
     Scroll.ScrollBarImageColor3 = Color3.fromRGB(65, 65, 70)
-    Scroll.Active = true -- FIX: Forces input capture matrix layer on background scrolling
+    Scroll.Active = true 
     Scroll.Parent = ViewFrame
     
     local ListLayout = Instance.new("UIListLayout")
@@ -1227,7 +1277,7 @@ function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickE
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
     Card.BorderSizePixel = 0
-    Card.Active = true -- FIX: Absorbs scrolling focus boundaries
+    Card.Active = true 
     Card.Parent = scrollTarget
     
     local CardCorner = Instance.new("UICorner")
@@ -1296,7 +1346,7 @@ function ViewCreator.AddActionCard(scrollTarget, labelText, buttonText, onClickE
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
     Card.BorderSizePixel = 0
-    Card.Active = true -- FIX: Absorbs scrolling focus boundaries
+    Card.Active = true 
     Card.Parent = scrollTarget
     
     local CardCorner = Instance.new("UICorner")
@@ -1336,7 +1386,7 @@ function ViewCreator.AddInputCard(scrollTarget, labelText, defaultText, onTextCh
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
     Card.BorderSizePixel = 0
-    Card.Active = true -- FIX: Absorbs scrolling focus boundaries
+    Card.Active = true 
     Card.Parent = scrollTarget
     
     local CardCorner = Instance.new("UICorner")
@@ -1384,7 +1434,7 @@ function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optio
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
     Card.BorderSizePixel = 0
-    Card.Active = true -- FIX: Absorbs scrolling focus boundaries
+    Card.Active = true 
     Card.Parent = scrollTarget
     
     local CardCorner = Instance.new("UICorner")
@@ -1565,7 +1615,7 @@ function ViewCreator.AddSingleDropdownCard(scrollTarget, labelText, defaultText,
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
     Card.BorderSizePixel = 0
-    Card.Active = true -- FIX: Absorbs scrolling focus boundaries
+    Card.Active = true 
     Card.Parent = scrollTarget
     
     local CardCorner = Instance.new("UICorner")
@@ -1652,15 +1702,11 @@ function ViewCreator.AddSingleDropdownCard(scrollTarget, labelText, defaultText,
     local currentSelection = defaultText
     local optionVisualUpdaters = {}
     
-    local function updateMainButtonText()
-        DropdownBtn.Text = currentSelection or "Select Option"
-        onSelect(currentSelection)
-    end
-    
-    local function externalUpdateHandler(val)
-        currentSelection = val
+    local function externalUpdateHandler(txt)
+        currentSelection = txt
+        DropdownBtn.Text = tostring(txt)
         for _, updater in pairs(optionVisualUpdaters) do updater() end
-        DropdownBtn.Text = currentSelection or "Select Option"
+        onSelect(txt)
     end
     
     if registryKey then ToggleRegistry[registryKey] = externalUpdateHandler end
@@ -1693,297 +1739,179 @@ function ViewCreator.AddSingleDropdownCard(scrollTarget, labelText, defaultText,
         
         OptBtn.MouseButton1Click:Connect(function()
             currentSelection = option
+            DropdownBtn.Text = option
             for _, updater in pairs(optionVisualUpdaters) do updater() end
-            updateMainButtonText()
             toggleDropdown()
+            onSelect(option)
         end)
     end
-    updateMainButtonText()
 end
 
 -- ---------------------------------------------------------------------
--- RUNTIME DEPLOYMENT ENGINE
+-- RUNTIME VIEW DEPLOYMENT ENGINE
 -- ---------------------------------------------------------------------
 local App = BaseLayout.new()
 local Nav = Sidebar.new(App.Sidebar)
 
 -- Build Core Tabs Canvas Arrays
+local ShopView, ShopScroll = ViewCreator.SetupCanvas("Automated Shop Engine", App.ViewContainer)
 local HuntView, HuntScroll = ViewCreator.SetupCanvas("Pet Interception System", App.ViewContainer)
 local MiscView, MiscScroll = ViewCreator.SetupCanvas("More FPS & Optimization", App.ViewContainer)
 local SettingsView, SettingsScroll = ViewCreator.SetupCanvas("Core Navigation Engine", App.ViewContainer)
 local ConfigView, ConfigScroll = ViewCreator.SetupCanvas("Config Manager (JSON)", App.ViewContainer)
 
 -- ---------------------------------------------------------------------
--- TAB 1: PET HUNTER ENGINE CONFIGURATION
+-- TAB: AUTOMATED SHOP ENGINE (SHOP SEEDS FIRST)
 -- ---------------------------------------------------------------------
+ViewCreator.AddSectionHeader(ShopScroll, "Seeds Purchase Controller")
 
--- WILD PET SECTION
-ViewCreator.AddSectionHeader(HuntScroll, "Wild Pet")
+local GAG2_Seeds = {
+    "Hypno Bloom", "Moon Bloom", "Dragon's Breath", "Venus Fly Trap", "Mushroom", 
+    "Venom Spitter", "Sunflower", "Poison Apple", "Pomegranate", "Bamboo", 
+    "Corn", "Cactus", "Pineapple", "Banana", "Grape", "Coconut", "Mango", 
+    "Apple", "Tomato", "Strawberry", "Carrot", "Tulip", "Blueberry"
+}
 
-ViewCreator.AddToggleCard(HuntScroll, "⭐ ENABLE AUTO PET HUNT", Config.PetHuntEnabled, function(bool)
+-- FIRST PLACEMENT: Shop Seeds Selection Dropdown Matrix
+ViewCreator.AddSingleDropdownCard(ShopScroll, "Shop Seeds Selection", Config.SelectedSeed, GAG2_Seeds, function(choice)
+    Config.SelectedSeed = choice
+    print("[SHOP]: Active transaction matrix targeted -> " .. tostring(choice))
+end, "SelectedSeed")
+
+local quantities = {"1", "5", "10", "20", "50", "100"}
+ViewCreator.AddSingleDropdownCard(ShopScroll, "Purchase Quantity Batch", tostring(Config.BuyAmount), quantities, function(amt)
+    Config.BuyAmount = tonumber(amt) or 1
+end, "BuyAmount")
+
+ViewCreator.AddToggleCard(ShopScroll, "Loop Auto-Buy Target Seed", Config.AutoBuySeeds, function(bool)
+    Config.AutoBuySeeds = bool
+end, "AutoBuySeeds")
+
+ViewCreator.AddActionCard(ShopScroll, "Instant Purchase Transaction", "Buy Now", function()
+    executeSeedPurchase(Config.SelectedSeed, Config.BuyAmount)
+end)
+
+-- ---------------------------------------------------------------------
+-- TAB: PET HUNTER
+-- ---------------------------------------------------------------------
+ViewCreator.AddSectionHeader(HuntScroll, "Primary Automation Matrix")
+ViewCreator.AddToggleCard(HuntScroll, "Enable Active Pet Hunting Engine", Config.PetHuntEnabled, function(bool)
     Config.PetHuntEnabled = bool
 end, "PetHuntEnabled")
 
-ViewCreator.AddToggleCard(HuntScroll, "🛡️ PET PURCHASE PROTECTION", Config.ProtectionEnabled, function(bool)
+ViewCreator.AddToggleCard(HuntScroll, "Enable Anti-Thief Protection Field", Config.ProtectionEnabled, function(bool)
     Config.ProtectionEnabled = bool
 end, "ProtectionEnabled")
 
-for _, petData in ipairs(Database) do
-    local displayName = petData[1]
-    local configKey = petData[2]
-    local details = petData[3] or petData[2]
-    if not petData[3] then configKey = displayName end
-    
-    ViewCreator.AddToggleCard(HuntScroll, "Target: " .. displayName .. " [" .. details .. "]", Config.TargetPets[configKey], function(bool)
-        Config.TargetPets[configKey] = bool
-    end, "Pet_" .. configKey)
+ViewCreator.AddInputCard(HuntScroll, "Anti-Thief Security Radius (Studs)", tostring(Config.ProtectionRadius), function(val)
+    Config.ProtectionRadius = tonumber(val) or 15
+end, "ProtectionRadius")
+
+ViewCreator.AddSectionHeader(HuntScroll, "Target Selection Matrix")
+for _, petInfo in ipairs(Database) do
+    local displayName = petInfo[1]
+    local internalKey = petInfo[3] or petInfo[1]
+    ViewCreator.AddToggleCard(HuntScroll, "Hunt: " .. displayName, Config.TargetPets[internalKey] or false, function(bool)
+        Config.TargetPets[internalKey] = bool
+    end, "Pet_" .. internalKey)
 end
 
--- PET FINDER (SERVER HOPPING) SECTION
-ViewCreator.AddSectionHeader(HuntScroll, "Pet Finder")
-
-ViewCreator.AddToggleCard(HuntScroll, "🔄 Enable Automated Server Hopping", Config.ServerHopEnabled, function(bool)
-    Config.ServerHopEnabled = bool
-end, "ServerHopEnabled")
-
-ViewCreator.AddInputCard(HuntScroll, "Max Server Players Limit", tostring(Config.MaxServerPlayers), function(val)
-    Config.MaxServerPlayers = tonumber(val) or 2
-end, "MaxServerPlayers")
-
-ViewCreator.AddActionCard(HuntScroll, "Manual Trigger Room Rotation", "Hop Server", function()
-    rotateServerInstance()
-end)
-
 -- ---------------------------------------------------------------------
--- TAB 2: MISCELLANEOUS GAMEPLAY & PERFORMANCE ENGINE OPTIONS
+-- TAB: MISC OPTIMIZATIONS
 -- ---------------------------------------------------------------------
-ViewCreator.AddSectionHeader(MiscScroll, "Map Controls")
-
-ViewCreator.AddActionCard(MiscScroll, "Remove Other Gardens", "Clean", function()
-    removeOtherGardensInstantly()
-    print("[OPTIMIZATION]: Executed instant targeted memory purge.")
-end)
-
-ViewCreator.AddToggleCard(MiscScroll, "Auto Remove Other Gardens (Loop)", Config.AutoRemoveOtherGardens, function(bool)
+ViewCreator.AddSectionHeader(MiscScroll, "Lag Reduction & Render Control")
+ViewCreator.AddToggleCard(MiscScroll, "Instantly Destroy Foreign Gardens", Config.AutoRemoveOtherGardens, function(bool)
     Config.AutoRemoveOtherGardens = bool
-    if bool then removeOtherGardensInstantly() end
 end, "AutoRemoveOtherGardens")
 
-ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", function()
+ViewCreator.AddActionCard(MiscScroll, "Apply Aggressive Hardware Booster", "Boost FPS", function()
     applyAggressiveLagReduction()
-    print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
 end)
 
-ViewCreator.AddSectionHeader(MiscScroll, "Environment")
-
-ViewCreator.AddToggleCard(MiscScroll, "Full Bright", Config.FullBright, function(bool)
+ViewCreator.AddToggleCard(MiscScroll, "Constant Full Brightness Mode", Config.FullBright, function(bool)
     Config.FullBright = bool
-    if not bool then
-        pcall(function()
-            Lighting.Ambient = OriginalLightingSettings.Ambient
-            Lighting.ColorShift_Top = OriginalLightingSettings.ColorShift_Top
-            Lighting.Brightness = OriginalLightingSettings.Brightness
-        end)
-    end
 end, "FullBright")
 
-ViewCreator.AddToggleCard(MiscScroll, "Infinite Zoom Out", Config.InfiniteZoom, function(bool)
+ViewCreator.AddToggleCard(MiscScroll, "Infinite Zoom Distance Matrix", Config.InfiniteZoom, function(bool)
     Config.InfiniteZoom = bool
 end, "InfiniteZoom")
 
-ViewCreator.AddSectionHeader(MiscScroll, "Fling")
-
-ViewCreator.AddToggleCard(MiscScroll, "Anti-Fling", Config.AntiFling, function(bool)
+ViewCreator.AddToggleCard(MiscScroll, "Anti-Fling Structural Safeties", Config.AntiFling, function(bool)
     Config.AntiFling = bool
 end, "AntiFling")
 
-ViewCreator.AddSectionHeader(MiscScroll, "Knockback")
-
-ViewCreator.AddToggleCard(MiscScroll, "Less knockback", Config.LessKnockback, function(bool)
+ViewCreator.AddToggleCard(MiscScroll, "Dampen Incoming Knockback Forces", Config.LessKnockback, function(bool)
     Config.LessKnockback = bool
 end, "LessKnockback")
 
-ViewCreator.AddSectionHeader(MiscScroll, "Prompt")
-
-ViewCreator.AddToggleCard(MiscScroll, "Instant Interact Prompt", Config.InstantPrompt, function(bool)
+ViewCreator.AddToggleCard(MiscScroll, "Instantaneous Proximity Prompts", Config.InstantPrompt, function(bool)
     Config.InstantPrompt = bool
 end, "InstantPrompt")
 
-ViewCreator.AddSectionHeader(MiscScroll, "Gameplay Paused")
-
-ViewCreator.AddToggleCard(MiscScroll, "Bypass Gameplay Paused", Config.BypassGameplayPaused, function(bool)
+ViewCreator.AddToggleCard(MiscScroll, "Bypass Gameplay Paused Prompts", Config.BypassGameplayPaused, function(bool)
     Config.BypassGameplayPaused = bool
 end, "BypassGameplayPaused")
 
-ViewCreator.AddSectionHeader(MiscScroll, "ESP Spawned Pets")
-
-local petOptions = {"None", "Raccoon", "Robin", "Frog", "Bunny", "Deer", "Owl", "Bee", "Unicorn", "GoldenDragonfly", "IceSerpent"}
-local rarityOptions = {"None", "Epic", "Legendary", "Mythic", "Super", "Rare", "Uncommon", "Common"}
-local sizeOptions = {"None", "Big", "Huge"}
-
-ViewCreator.AddDropdownCard(MiscScroll, "Select Pets", Config.ESPSelectedPets, petOptions, function(selectedValue)
-    Config.ESPSelectedPets = selectedValue
-    updateESPCache("Pets", selectedValue)
-end, "ESPSelectedPets")
-
-ViewCreator.AddDropdownCard(MiscScroll, "Select Rarity Pets", Config.ESPSelectedRarities, rarityOptions, function(selectedValue)
-    Config.ESPSelectedRarities = selectedValue
-    updateESPCache("Rarities", selectedValue)
-end, "ESPSelectedRarities")
-
-ViewCreator.AddDropdownCard(MiscScroll, "Select Size Pets", Config.ESPSelectedSizes, sizeOptions, function(selectedValue)
-    Config.ESPSelectedSizes = selectedValue
-    updateESPCache("Sizes", selectedValue)
-end, "ESPSelectedSizes")
-
-ViewCreator.AddToggleCard(MiscScroll, "ESP Spawned Pets", Config.ESPEnabled, function(bool)
-    Config.ESPEnabled = bool
-    if not bool then clearAllESP() end
-end, "ESPEnabled")
-
 -- ---------------------------------------------------------------------
--- TAB 3: SETTINGS ENGINE CONFIGURATION (TELEPORT MANAGER RECON)
+-- TAB: CORE NAVIGATION SETTINGS
 -- ---------------------------------------------------------------------
-ViewCreator.AddSectionHeader(SettingsScroll, "Movement Control Parameters")
-
-local teleportModes = {"Tween", "Walk", "Teleport"}
-ViewCreator.AddSingleDropdownCard(SettingsScroll, "Teleport Manager", Config.TeleportMode, teleportModes, function(selectedMode)
-    Config.TeleportMode = selectedMode
-    print("[ENGINE]: Velocity mechanics shifted to mode -> " .. tostring(selectedMode))
+ViewCreator.AddSectionHeader(SettingsScroll, "Movement Mechanics")
+local modes = {"Tween", "Teleport", "Walk"}
+ViewCreator.AddSingleDropdownCard(SettingsScroll, "Active Travel Execution Mode", Config.TeleportMode, modes, function(choice)
+    Config.TeleportMode = choice
 end, "TeleportMode")
 
-ViewCreator.AddSectionHeader(SettingsScroll, "Interface & Gameplay Bypasses")
+ViewCreator.AddSectionHeader(SettingsScroll, "Server Rotation (Pet Finder)")
+ViewCreator.AddToggleCard(SettingsScroll, "Enable Public Room Rotation Engine", Config.ServerHopEnabled, function(bool)
+    Config.ServerHopEnabled = bool
+end, "ServerHopEnabled")
 
-ViewCreator.AddToggleCard(SettingsScroll, "⚡ INSTANT SKIP LOADING SCREEN", Config.SkipLoadingScreen, function(bool)
-    Config.SkipLoadingScreen = bool
-end, "SkipLoadingScreen")
+ViewCreator.AddInputCard(SettingsScroll, "Max Room Players Allowed", tostring(Config.MaxServerPlayers), function(val)
+    Config.MaxServerPlayers = tonumber(val) or 2
+end, "MaxServerPlayers")
+
+ViewCreator.AddSectionHeader(SettingsScroll, "Visual ESP Vector Overlay")
+ViewCreator.AddToggleCard(SettingsScroll, "Enable Global ESP Engine Core", Config.ESPEnabled, function(bool)
+    Config.ESPEnabled = bool
+end, "ESPEnabled")
+
+local availablePets = {}
+for _, item in ipairs(Database) do table.insert(availablePets, item[3] or item[1]) end
+ViewCreator.AddDropdownCard(SettingsScroll, "Filter: Target Species Select", Config.ESPSelectedPets, availablePets, function(str)
+    Config.ESPSelectedPets = str
+    updateESPCache("Pets", str)
+end, "ESPSelectedPets")
+
+local rarities = {"Common", "Uncommon", "Rare", "Legendary", "Mythic", "Super"}
+ViewCreator.AddDropdownCard(SettingsScroll, "Filter: Target Rarity Select", Config.ESPSelectedRarities, rarities, function(str)
+    Config.ESPSelectedRarities = str
+    updateESPCache("Rarities", str)
+end, "ESPSelectedRarities")
+
+local sizes = {"Normal", "Giant", "Jumbo", "Colossal"}
+ViewCreator.AddDropdownCard(SettingsScroll, "Filter: Target Size Select", Config.ESPSelectedSizes, sizes, function(str)
+    Config.ESPSelectedSizes = str
+    updateESPCache("Sizes", str)
+end, "ESPSelectedSizes")
 
 -- ---------------------------------------------------------------------
--- TAB 4: CONFIG MANAGE SYSTEM (JSON DRIVEN)
+-- TAB: CONFIG MANAGEMENT
 -- ---------------------------------------------------------------------
-ViewCreator.AddActionCard(ConfigScroll, "Save Current System Settings", "Save Config", function()
+ViewCreator.AddSectionHeader(ConfigScroll, "Hardware Profiles")
+ViewCreator.AddActionCard(ConfigScroll, "Save Active Script Matrix State", "Save Profile", function()
     saveConfig()
 end)
 
-ViewCreator.AddActionCard(ConfigScroll, "Load Configuration History", "Load Config", function()
+ViewCreator.AddActionCard(ConfigScroll, "Reload Last Saved Hardware Profile", "Load Profile", function()
     loadConfig()
 end)
 
--- Register Sidebar Matrix Components
+-- Register Sidebar Navigation Links
+Nav:RegisterTab("Shop", "🛒", ShopView)
 Nav:RegisterTab("Pet Hunter", "🐾", HuntView)
 Nav:RegisterTab("Misc", "⚙️", MiscView)
 Nav:RegisterTab("Settings", "🛠️", SettingsView)
 Nav:RegisterTab("Configs", "💾", ConfigView)
 
--- Automated Workspace State Setup: Auto Load JSON Configuration File
-pcall(loadConfig)
-
-print("[SYSTEM]: Layout Engine Version 6.2 fully configured. Server Hop Matrix online.")
-
-
--- =============================================================================
--- [ Grow a Garden 2 — Ultimate Stud UI Extension (Font & Icon Fixed) ]
--- Paste this clean version directly at the very bottom of your master code.
--- =============================================================================
-task.spawn(function()
-    local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10)
-    
-    if not PlayerGui then return end
-
-    -- Core layout containers from Dex
-    local buttonContainer = PlayerGui:WaitForChild("TeleportButtons", 5):WaitForChild("TeleportButtons", 5)
-    local templateButton = buttonContainer:WaitForChild("SeedsButton", 5)
-
-    -- Destination Anchors
-    local teleports = workspace:WaitForChild("Teleports", 5)
-    local gearsPart = teleports:WaitForChild("Gears", 5)
-    local propsPart = teleports:WaitForChild("Props", 5)
-
-    if not (buttonContainer and templateButton and gearsPart and propsPart) then return end
-
-    -- Solid theme tokens to tint the native stud pattern cleanly
-    local GEARS_COLOR = Color3.fromRGB(0, 162, 255)  -- Crisp Royal Blue
-    local PROPS_COLOR = Color3.fromRGB(255, 138, 210) -- Clean Stand Pink
-
-    -- Safe physics vector calculation
-    local function teleportTo(targetPart)
-        local character = LocalPlayer.Character
-        if character and character:FindFirstChild("HumanoidRootPart") then
-            character.HumanoidRootPart.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0)
-        end
-    end
-
-    -- Strict layout sanitization and color-locking engine
-    local function cleanAndLockUI(button, labelText, themeColor)
-        
-        -- Loop through descendants to fix specific layout elements
-        for _, child in ipairs(button:GetDescendants()) do
-            
-            -- FIX 1: Clean up typography shadows by forcing strict alignment matching
-            if child:IsA("TextLabel") or child:IsA("TextButton") then
-                child.Text = labelText
-                child:GetPropertyChangedSignal("Text"):Connect(function()
-                    child.Text = labelText
-                end)
-            end
-            
-            -- FIX 2: Locate and eliminate the ghost leaf icon asset completely
-            if child:IsA("ImageLabel") and child.Name ~= "Background" then
-                -- Safely hides the leaf icon graphic so it doesn't cross-contaminate text space
-                if child.Size.X.Scale < 0.9 or string.find(string.lower(child.Name), "icon") or string.find(string.lower(child.Name), "leaf") then
-                    child.Visible = false
-                end
-            end
-
-            -- FIX 3: Capture stud textures and lock themes against game script overrides
-            if child:IsA("ImageLabel") or child:IsA("ImageButton") then
-                if child.Visible then
-                    child.ImageColor3 = themeColor
-                    child:GetPropertyChangedSignal("ImageColor3"):Connect(function()
-                        child.ImageColor3 = themeColor
-                    end)
-                end
-            elseif child:IsA("Frame") then
-                child.BackgroundColor3 = themeColor
-                child:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
-                    child.BackgroundColor3 = themeColor
-                end)
-            end
-        end
-
-        -- Lock main button wrapper color properties
-        button.BackgroundColor3 = themeColor
-        if button:IsA("ImageButton") then
-            button.ImageColor3 = themeColor
-            button:GetPropertyChangedSignal("ImageColor3"):Connect(function()
-                button.ImageColor3 = themeColor
-            end)
-        end
-    end
-
-    -- Core constructor
-    local function injectCustomButton(name, labelText, themeColor, targetPart)
-        if buttonContainer:FindFirstChild(name) then
-            buttonContainer[name]:Destroy()
-        end
-
-        local newButton = templateButton:Clone()
-        newButton.Name = name
-
-        -- Sanitize text layers, delete icons, and lock colors
-        cleanAndLockUI(newButton, labelText, themeColor)
-
-        -- Action activation link
-        newButton.MouseButton1Click:Connect(function()
-            teleportTo(targetPart)
-        end)
-
-        newButton.Parent = buttonContainer
-    end
-
-    -- Execute injection with clean typography strings
-    injectCustomButton("GearsButton", "Gears", GEARS_COLOR, gearsPart)
-    injectCustomButton("PropsButton", "Props", PROPS_COLOR, propsPart)
-end)
+-- Initialization Hooks
+loadConfig()
