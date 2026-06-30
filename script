@@ -1,6 +1,6 @@
 loadstring([[
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 4.9 (DYNAMIC COLOR MATRIX & CLEAN ESP)
+-- PREMIUM UI ENGINE - VERSION 5.0 (INTEGRATED SETTINGS & TELEPORT MGR)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -41,7 +41,10 @@ local Config = {
     ESPEnabled = false,
     ESPSelectedPets = "IceSerpent",
     ESPSelectedRarities = "Select Options",
-    ESPSelectedSizes = "Select Options"
+    ESPSelectedSizes = "Select Options",
+    
+    -- SETTINGS CONTROL MATRIX
+    TeleportMode = "Tween"
 }
 
 -- Registry to track UI toggle elements for dynamic visual updates
@@ -231,7 +234,8 @@ local function loadConfig()
                 "PetHuntEnabled", "ProtectionEnabled", "AutoRemoveOtherGardens",
                 "FullBright", "InfiniteZoom", "AntiFling", "LessKnockback", 
                 "InstantPrompt", "BypassGameplayPaused", "ESPEnabled",
-                "ESPSelectedPets", "ESPSelectedRarities", "ESPSelectedSizes"
+                "ESPSelectedPets", "ESPSelectedRarities", "ESPSelectedSizes",
+                "TeleportMode"
             }
             
             for _, key in ipairs(simpleElements) do
@@ -432,8 +436,6 @@ local function renderESPForModel(petModel)
     textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     textLabel.Parent = billboard
     table.insert(trackedElements, billboard)
-    
-    -- NOTE: BoxHandleAdornment highlight box generation block completely extracted to ensure performance transparency.
     
     ActiveESP[petModel] = trackedElements
 end
@@ -1243,6 +1245,148 @@ function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optio
     updateMainButtonText()
 end
 
+-- ADVANCED SINGLE DROPDOWN COMPONENT (FOR SETTINGS & MODE MANAGER)
+function ViewCreator.AddSingleDropdownCard(scrollTarget, labelText, defaultText, optionsList, onSelect, registryKey)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, -8, 0, 42)
+    Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+    Card.BorderSizePixel = 0
+    Card.Parent = scrollTarget
+    
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 8)
+    CardCorner.Parent = Card
+    
+    local CardTitle = Instance.new("TextLabel")
+    CardTitle.Size = UDim2.new(0.5, 0, 1, 0)
+    CardTitle.Position = UDim2.new(0, 12, 0, 0)
+    CardTitle.BackgroundTransparency = 1
+    CardTitle.Text = labelText
+    CardTitle.TextColor3 = Color3.fromRGB(230, 230, 235)
+    CardTitle.TextSize = 13
+    CardTitle.Font = Enum.Font.GothamMedium
+    CardTitle.TextXAlignment = Enum.TextXAlignment.Left
+    CardTitle.Parent = Card
+    
+    local DropdownBtn = Instance.new("TextButton")
+    DropdownBtn.Size = UDim2.new(0.42, 0, 0, 26)
+    DropdownBtn.Position = UDim2.new(1, -192, 0.5, -13)
+    DropdownBtn.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
+    DropdownBtn.Text = defaultText or "Select Option"
+    DropdownBtn.TextColor3 = Color3.fromRGB(220, 220, 225)
+    DropdownBtn.Font = Enum.Font.Gotham
+    DropdownBtn.TextSize = 12
+    DropdownBtn.TextTruncate = Enum.TextTruncate.AtEnd
+    DropdownBtn.Parent = Card
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+    BtnCorner.Parent = DropdownBtn
+    
+    local DropdownList = Instance.new("ScrollingFrame")
+    DropdownList.Size = UDim2.new(0, 180, 0, 120)
+    DropdownList.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    DropdownList.BorderSizePixel = 0
+    DropdownList.ScrollBarThickness = 4
+    DropdownList.ScrollBarImageColor3 = Color3.fromRGB(70, 70, 75)
+    DropdownList.Visible = false
+    DropdownList.ZIndex = 5000
+    
+    local ListCorner = Instance.new("UICorner")
+    ListCorner.CornerRadius = UDim.new(0, 6)
+    ListCorner.Parent = DropdownList
+    
+    local ListStroke = Instance.new("UIStroke")
+    ListStroke.Color = Color3.fromRGB(48, 48, 54)
+    ListStroke.Thickness = 1
+    ListStroke.Parent = DropdownList
+
+    local ListLayout = Instance.new("UIListLayout")
+    ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ListLayout.Padding = UDim.new(0, 1)
+    ListLayout.Parent = DropdownList
+    
+    task.spawn(function()
+        local screenGui = scrollTarget:FindFirstAncestorOfClass("ScreenGui")
+        while not screenGui do
+            task.wait(0.1)
+            screenGui = scrollTarget:FindFirstAncestorOfClass("ScreenGui")
+        end
+        DropdownList.Parent = screenGui
+    end)
+    
+    local isOpen = false
+    local function toggleDropdown()
+        isOpen = not isOpen
+        if isOpen then
+            DropdownList.Position = UDim2.new(0, DropdownBtn.AbsolutePosition.X, 0, DropdownBtn.AbsolutePosition.Y + DropdownBtn.AbsoluteSize.Y + 3)
+            DropdownList.Size = UDim2.new(0, DropdownBtn.AbsoluteSize.X, 0, math.min(#optionsList * 26 + 4, 150))
+            DropdownList.Visible = true
+        else
+            DropdownList.Visible = false
+        end
+    end
+    
+    DropdownBtn.MouseButton1Click:Connect(toggleDropdown)
+    DropdownBtn:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+        if isOpen then
+            DropdownList.Position = UDim2.new(0, DropdownBtn.AbsolutePosition.X, 0, DropdownBtn.AbsolutePosition.Y + DropdownBtn.AbsoluteSize.Y + 3)
+        end
+    end)
+    
+    local currentSelection = defaultText
+    local optionVisualUpdaters = {}
+    
+    local function updateMainButtonText()
+        DropdownBtn.Text = currentSelection or "Select Option"
+        onSelect(currentSelection)
+    end
+    
+    local function externalUpdateHandler(val)
+        currentSelection = val
+        for _, updater in pairs(optionVisualUpdaters) do updater() end
+        DropdownBtn.Text = currentSelection or "Select Option"
+    end
+    
+    if registryKey then ToggleRegistry[registryKey] = externalUpdateHandler end
+    
+    for i, option in ipairs(optionsList) do
+        local OptBtn = Instance.new("TextButton")
+        OptBtn.Size = UDim2.new(1, 0, 0, 26)
+        OptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+        OptBtn.BorderSizePixel = 0
+        OptBtn.Font = Enum.Font.Gotham
+        OptBtn.TextSize = 12
+        OptBtn.TextXAlignment = Enum.TextXAlignment.Left
+        OptBtn.LayoutOrder = i
+        OptBtn.ZIndex = 5001
+        OptBtn.Parent = DropdownList
+        
+        optionVisualUpdaters[option] = function()
+            if currentSelection == option then
+                OptBtn.Text = "  ✓  " .. option
+                OptBtn.TextColor3 = Color3.fromRGB(100, 255, 150)
+            else
+                OptBtn.Text = "      " .. option
+                OptBtn.TextColor3 = Color3.fromRGB(190, 190, 195)
+            end
+        end
+        optionVisualUpdaters[option]()
+        
+        OptBtn.MouseEnter:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(38, 38, 44) end)
+        OptBtn.MouseLeave:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32) end)
+        
+        OptBtn.MouseButton1Click:Connect(function()
+            currentSelection = option
+            for _, updater in pairs(optionVisualUpdaters) do updater() end
+            updateMainButtonText()
+            toggleDropdown()
+        end)
+    end
+    
+    updateMainButtonText()
+end
+
 -- ---------------------------------------------------------------------
 -- RUNTIME DEPLOYMENT ENGINE
 -- ---------------------------------------------------------------------
@@ -1252,6 +1396,7 @@ local Nav = Sidebar.new(App.Sidebar)
 -- Build Core Tabs Canvas Arrays
 local HuntView, HuntScroll = ViewCreator.SetupCanvas("Pet Interception System", App.ViewContainer)
 local MiscView, MiscScroll = ViewCreator.SetupCanvas("More FPS & Optimization", App.ViewContainer)
+local SettingsView, SettingsScroll = ViewCreator.SetupCanvas("Core Navigation Engine", App.ViewContainer)
 local ConfigView, ConfigScroll = ViewCreator.SetupCanvas("Config Manager (JSON)", App.ViewContainer)
 
 -- ---------------------------------------------------------------------
@@ -1296,7 +1441,6 @@ ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", f
     print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
 end)
 
--- INTEGRATED UTILITIES MODULE
 ViewCreator.AddSectionHeader(MiscScroll, "Environment")
 
 ViewCreator.AddToggleCard(MiscScroll, "Full Bright", Config.FullBright, function(bool)
@@ -1338,7 +1482,6 @@ ViewCreator.AddToggleCard(MiscScroll, "Bypass Gameplay Paused", Config.BypassGam
     Config.BypassGameplayPaused = bool
 end, "BypassGameplayPaused")
 
--- EXTENDED MODULES: MODULAR ESP DROPDOWNS INTEGRATION MATRIX
 ViewCreator.AddSectionHeader(MiscScroll, "ESP Spawned Pets")
 
 local petOptions = {"None", "Raccoon", "Robin", "Frog", "Bunny", "Deer", "Owl", "Bee", "Unicorn", "GoldenDragonfly", "IceSerpent"}
@@ -1362,9 +1505,19 @@ ViewCreator.AddToggleCard(MiscScroll, "ESP Spawned Pets", Config.ESPEnabled, fun
     if not bool then clearAllESP() end
 end, "ESPEnabled")
 
+-- ---------------------------------------------------------------------
+-- TAB 3: SETTINGS ENGINE CONFIGURATION (TELEPORT MANAGER RECON)
+-- ---------------------------------------------------------------------
+ViewCreator.AddSectionHeader(SettingsScroll, "Movement Control Parameters")
+
+local teleportModes = {"Tween", "Teleporter (Tool)", "Teleport"}
+ViewCreator.AddSingleDropdownCard(SettingsScroll, "Teleport Manager", Config.TeleportMode, teleportModes, function(selectedMode)
+    Config.TeleportMode = selectedMode
+    print("[ENGINE]: Velocity mechanics shifted to mode -> " .. tostring(selectedMode))
+end, "TeleportMode")
 
 -- ---------------------------------------------------------------------
--- TAB 3: CONFIG MANAGE SYSTEM (JSON DRIVEN)
+-- TAB 4: CONFIG MANAGE SYSTEM (JSON DRIVEN)
 -- ---------------------------------------------------------------------
 ViewCreator.AddActionCard(ConfigScroll, "Save Current System Settings", "Save Config", function()
     saveConfig()
@@ -1377,10 +1530,11 @@ end)
 -- Register Sidebar Matrix Components
 Nav:RegisterTab("Pet Hunter", "🐾", HuntView)
 Nav:RegisterTab("Misc", "⚙️", MiscView)
+Nav:RegisterTab("Settings", "🛠️", SettingsView)
 Nav:RegisterTab("Configs", "💾", ConfigView)
 
 -- Automated Workspace State Setup: Auto Load JSON Configuration File
 pcall(loadConfig)
 
-print("[SYSTEM]: Layout Engine Version 4.9 fully loaded. Clean multi-color text ESP active.")
+print("[SYSTEM]: Layout Engine Version 5.0 fully configured. Settings / Teleport Manager operational.")
 ]])()
