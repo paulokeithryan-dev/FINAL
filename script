@@ -1,13 +1,12 @@
 loadstring([[
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 5.1 (FULLY CONSOLIDATED PET HUNT & HOP ENGINE)
+-- PREMIUM UI ENGINE - VERSION 6.0 (UNIFIED MASTER ENGINE)
 -- =====================================================================
 
 -- Global Configuration Matrix
 local Config = {
+    -- INTERCEPTION SETTINGS
     PetHuntEnabled = false,
-    ServerHopEnabled = false,
-    MaxServerPlayers = 2,
     ProtectionEnabled = false, 
     ProtectionRadius = 15,     
     TargetPets = {
@@ -26,6 +25,12 @@ local Config = {
         ["BlackDragon"] = false,
         ["IceSerpent"] = false,
     },
+    
+    -- PET FINDER SETTINGS
+    ServerHopEnabled = false,
+    MaxServerPlayers = 2,
+
+    -- VELOCITY
     FlyHeight = 2.2,
     TweenSpeed = 38,           
     CombatDashSpeed = 155,    
@@ -64,6 +69,7 @@ local GuiService = game:GetService("GuiService")
 local PathfindingService = game:GetService("PathfindingService")
 local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
+local PLACE_ID = game.PlaceId
 
 local FILE_NAME = "PetHunter_PremiumConfig.json"
 local OriginalLightingSettings = {
@@ -89,15 +95,27 @@ local Database = {
     {"Ice Serpent", "IceSerpent", "Super ($20M)"}
 }
 
+-- Hex Color Matrix map for RichText formatting base on rarity
 local RarityHexColors = {
-    ["Common"] = "#FFFFFF",       
-    ["Uncommon"] = "#00FF00",     
-    ["Rare"] = "#00BFFF",         
-    ["Legendary"] = "#FFFF00",    
-    ["Mythic"] = "#FF0000",       
-    ["Super"] = "#FF00FF",        
+    ["Common"] = "#FFFFFF",       -- White
+    ["Uncommon"] = "#00FF00",     -- Green
+    ["Rare"] = "#00BFFF",         -- Blue (Deep Sky Blue)
+    ["Legendary"] = "#FFFF00",    -- Yellow
+    ["Mythic"] = "#FF0000",       -- Red
+    ["Super"] = "#FF00FF",        -- Magenta / Super
     ["Unknown"] = "#FFFFFF"
 }
+
+-- Global Teleport Error Handler
+TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
+    if player == LocalPlayer then
+        warn("[ALERT]: Teleport authorization failed: " .. tostring(errorMessage) .. ". Routing emergency fallback hop...")
+        task.wait(1.5)
+        pcall(function()
+            TeleportService:Teleport(PLACE_ID, LocalPlayer)
+        end)
+    end
+end)
 
 local function smoothFlyTo(targetCFrame, speedOverride)
     local character = LocalPlayer.Character
@@ -119,6 +137,7 @@ local function executeDualActionStrike(shovel)
     if camera then
         local safeX = 20
         local safeY = 220 
+        
         VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 0)
         VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 0)
     end
@@ -194,37 +213,75 @@ local function deployPurchaseInterception(activeTarget, rootPart)
 end
 
 -- ---------------------------------------------------------------------
--- DEDICATED LOW-PLAYER PUBLIC SERVER FINDER ROTATION MATRIX
+-- DEDICATED PET FINDER: PUBLIC ROOM ROTATION ENGINE
 -- ---------------------------------------------------------------------
 local function rotateServerInstance()
-    print("[BOT_ENGINE]: Querying server directory for optimal low-player public instances...")
-    local success, serverDirectory = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. tostring(game.PlaceId) .. "/servers/Public?sortOrder=Asc&limit=100"))
+    print("[PET_FINDER]: Transitioning room states. Sifting global server index arrays...")
+    
+    local apiURL = string.format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100", tostring(PLACE_ID))
+    local fetchSuccess, serverData = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(apiURL))
     end)
     
-    if success and serverDirectory and serverDirectory.data then
-        for _, server in ipairs(serverDirectory.data) do
-            if server.id ~= game.JobId and tonumber(server.playing) <= tonumber(Config.MaxServerPlayers) then
-                print(string.format("[BOT_ENGINE]: Targeted server match identified (%d players). Executing teleport sync...", server.playing))
-                task.wait(0.5)
-                
-                local teleportSuccess, teleportErr = pcall(function()
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
-                end)
-                if teleportSuccess then return end
+    if fetchSuccess and serverData and serverData.data then
+        local serverList = serverData.data
+        local priorityServers = {}
+        local backupServers = {}
+        
+        -- Separate servers based on player count thresholds
+        for _, server in pairs(serverList) do
+            if server.id and server.id ~= game.JobId and server.playing then
+                if server.playing >= 1 and server.playing <= Config.MaxServerPlayers then
+                    table.insert(priorityServers, server)
+                elseif server.playing < server.maxPlayers then
+                    table.insert(backupServers, server)
+                end
             end
+        end
+        
+        -- Shuffle Priority Pile
+        math.randomseed(os.time())
+        for i = #priorityServers, 2, -1 do
+            local j = math.random(i)
+            priorityServers[i], priorityServers[j] = priorityServers[j], priorityServers[i]
+        end
+        
+        -- Try to deploy to a priority low-player server
+        for _, server in pairs(priorityServers) do
+            print(string.format("[PET_FINDER]: Targeting sniper paradise instance (%d players) ID: %s", server.playing, tostring(server.id)))
+            task.wait(0.5)
+            local teleportSuccess, teleportErr = pcall(function()
+                TeleportService:TeleportToPlaceInstance(PLACE_ID, server.id, LocalPlayer)
+            end)
+            if teleportSuccess then return end
+        end
+        
+        -- Fallback: Shuffle and try regular servers if no priority ones connected
+        print("[PET_FINDER]: No immediate low-player targets available. Shifting to backup index array...")
+        for i = #backupServers, 2, -1 do
+            local j = math.random(i)
+            backupServers[i], backupServers[j] = backupServers[j], backupServers[i]
+        end
+        
+        for _, server in pairs(backupServers) do
+            task.wait(0.5)
+            local teleportSuccess, teleportErr = pcall(function()
+                TeleportService:TeleportToPlaceInstance(PLACE_ID, server.id, LocalPlayer)
+            end)
+            if teleportSuccess then return end
         end
     end
     
-    print("[BOT_ENGINE]: Public query directory exhausted. Deploying baseline safety hop...")
+    print("[PET_FINDER]: Public query directory exhausted. Deploying baseline safety hop...")
     pcall(function()
-        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+        TeleportService:Teleport(PLACE_ID, LocalPlayer)
     end)
 end
 
 -- ---------------------------------------------------------------------
--- CONFIG LOAD / SAVE PERSISTENCE HANDLERS
+-- PERFORMANCE OPTIMIZATION UTILITIES & JSON PERSISTENCE
 -- ---------------------------------------------------------------------
+
 local function saveConfig()
     local success, encoded = pcall(function()
         return HttpService:JSONEncode(Config)
@@ -256,11 +313,13 @@ local function loadConfig()
                 end
             end
             
+            -- Dynamic registration reload handlers
             local simpleElements = {
-                "PetHuntEnabled", "ServerHopEnabled", "MaxServerPlayers", "ProtectionEnabled", 
-                "AutoRemoveOtherGardens", "FullBright", "InfiniteZoom", "AntiFling", "LessKnockback", 
-                "InstantPrompt", "BypassGameplayPaused", "ESPEnabled", "ESPSelectedPets", 
-                "ESPSelectedRarities", "ESPSelectedSizes", "TeleportMode"
+                "PetHuntEnabled", "ProtectionEnabled", "AutoRemoveOtherGardens",
+                "FullBright", "InfiniteZoom", "AntiFling", "LessKnockback", 
+                "InstantPrompt", "BypassGameplayPaused", "ESPEnabled",
+                "ESPSelectedPets", "ESPSelectedRarities", "ESPSelectedSizes",
+                "TeleportMode", "ServerHopEnabled", "MaxServerPlayers"
             }
             
             for _, key in ipairs(simpleElements) do
@@ -278,16 +337,16 @@ local function loadConfig()
     end
 end
 
--- ---------------------------------------------------------------------
--- PERFORMANCE OPTIMIZATION UTILITIES
--- ---------------------------------------------------------------------
+-- Advanced Multi-Layered Ownership Guard Engine
 local function isMyGarden(garden)
     if garden.Name == LocalPlayer.Name or string.find(garden.Name, tostring(LocalPlayer.UserId)) then
         return true
     end
+    
     if garden:GetAttribute("Owner") == LocalPlayer.Name or garden:GetAttribute("Owner") == LocalPlayer.UserId or garden:GetAttribute("OwnerID") == LocalPlayer.UserId then
         return true
     end
+    
     for _, child in ipairs(garden:GetDescendants()) do
         if child:IsA("ValueBase") and (child.Value == LocalPlayer or child.Value == LocalPlayer.Name or tostring(child.Value) == tostring(LocalPlayer.UserId)) then
             return true
@@ -296,6 +355,7 @@ local function isMyGarden(garden)
             return true
         end
     end
+    
     return false
 end
 
@@ -318,6 +378,7 @@ local function applyAggressiveLagReduction()
         Lighting.EnvironmentDiffuseScale = 0
         Lighting.EnvironmentSpecularScale = 0
     end)
+    
     for _, obj in ipairs(Lighting:GetChildren()) do
         pcall(function()
             if obj:IsA("PostEffect") or obj:IsA("Atmosphere") or obj:IsA("Sky") or obj:IsA("Clouds") then
@@ -325,6 +386,7 @@ local function applyAggressiveLagReduction()
             end
         end)
     end
+    
     local terrain = workspace:FindFirstChildOfClass("Terrain")
     if terrain then
         pcall(function()
@@ -334,6 +396,7 @@ local function applyAggressiveLagReduction()
             terrain.WaterDetail = Enum.WaterDetail.Low
         end)
     end
+    
     for _, instance in ipairs(workspace:GetDescendants()) do
         pcall(function()
             if instance:IsA("ParticleEmitter") or instance:IsA("Smoke") or instance:IsA("Sparkles") or instance:IsA("Fire") then
@@ -345,14 +408,22 @@ local function applyAggressiveLagReduction()
                 instance.CastShadow = false
                 instance.Material = Enum.Material.SmoothPlastic
                 instance.Reflectance = 0
+                
                 if instance:IsA("MeshPart") then
-                    pcall(function() instance.RenderFidelity = Enum.RenderFidelity.Performance end)
+                    pcall(function()
+                        instance.RenderFidelity = Enum.RenderFidelity.Performance
+                    end)
                 end
             end
         end)
     end
-    pcall(function() settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalThrottle.Enabled end)
-    pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
+    
+    pcall(function()
+        settings().Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalThrottle.Enabled
+    end)
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    end)
 end
 
 -- ---------------------------------------------------------------------
@@ -362,7 +433,9 @@ local ActiveESP = {}
 
 local function clearAllESP()
     for model, elements in pairs(ActiveESP) do
-        for _, obj in ipairs(elements) do pcall(function() obj:Destroy() end) end
+        for _, obj in ipairs(elements) do
+            pcall(function() obj:Destroy() end)
+        end
     end
     table.clear(ActiveESP)
 end
@@ -375,6 +448,7 @@ local function renderESPForModel(petModel)
     local petName = petModel:GetAttribute("PetName") or petModel.Name
     local cleanName = string.gsub(petName, "%s+", "")
     
+    -- Filter 1: Individual Species Match
     if Config.ESPSelectedPets and Config.ESPSelectedPets ~= "" and Config.ESPSelectedPets ~= "None" and Config.ESPSelectedPets ~= "Select Options" then
         local foundMatch = false
         for token in string.gmatch(Config.ESPSelectedPets, "[^,%s]+") do
@@ -386,6 +460,7 @@ local function renderESPForModel(petModel)
         if not foundMatch then return end
     end
     
+    -- Filter 2: Rarity Extraction Lookup
     local petRarity = "Unknown"
     for _, item in ipairs(Database) do
         local targetKey = item[2]
@@ -407,6 +482,7 @@ local function renderESPForModel(petModel)
         if not foundMatch then return end
     end
     
+    -- Filter 3: Volumetric Size Evaluation
     local rawSize = petModel:GetAttribute("PetSize") or petModel:GetAttribute("Size") or "Normal"
     if Config.ESPSelectedSizes and Config.ESPSelectedSizes ~= "" and Config.ESPSelectedSizes ~= "None" and Config.ESPSelectedSizes ~= "Select Options" then
         local foundMatch = false
@@ -419,7 +495,9 @@ local function renderESPForModel(petModel)
         if not foundMatch then return end
     end
     
+    -- Dynamic Text Color Coding Sequence
     local chosenHex = RarityHexColors[petRarity] or "#FFFFFF"
+    
     local trackedElements = {}
     
     local billboard = Instance.new("BillboardGui")
@@ -432,7 +510,10 @@ local function renderESPForModel(petModel)
     textLabel.Size = UDim2.new(1, 0, 1, 0)
     textLabel.BackgroundTransparency = 1
     textLabel.RichText = true
+    
+    -- Combines White Pet name with customizable Rarity-colored text block
     textLabel.Text = string.format("<font color=\"#FFFFFF\">%s</font> <font color=\"%s\">[%s]</font>", petName, chosenHex, petRarity)
+    
     textLabel.Font = Enum.Font.GothamBold
     textLabel.TextSize = 12
     textLabel.TextStrokeTransparency = 0.4
@@ -444,21 +525,27 @@ local function renderESPForModel(petModel)
 end
 
 -- ---------------------------------------------------------------------
--- UTILITY PROCESSOR THREADS (BACKGROUND ENVIRONMENT)
+-- CORE GAMEPLAY UTILITIES RUNTIME ENVIRONMENT (BACKGROUND LOOPS)
 -- ---------------------------------------------------------------------
+
+-- Dedicated High-Refresh ESP Matrix Processor Thread
 task.spawn(function()
     while task.wait(0.4) do
         if Config.ESPEnabled then
             local mapFolder = workspace:FindFirstChild("Map")
             local wildFolder = mapFolder and mapFolder:FindFirstChild("WildPetSpawns")
             if wildFolder then
+                -- Purge lingering elements from dead/despawned targets
                 for cachedModel, instances in pairs(ActiveESP) do
                     if not cachedModel:IsDescendantOf(wildFolder) or not cachedModel:FindFirstChild("RootPart") then
                         for _, obj in ipairs(instances) do pcall(function() obj:Destroy() end) end
                         ActiveESP[cachedModel] = nil
                     end
                 end
-                for _, petModel in ipairs(wildFolder:GetChildren()) do renderESPForModel(petModel) end
+                -- Append active render arrays
+                for _, petModel in ipairs(wildFolder:GetChildren()) do
+                    renderESPForModel(petModel)
+                end
             end
         else
             if next(ActiveESP) ~= nil then clearAllESP() end
@@ -466,6 +553,7 @@ task.spawn(function()
     end
 end)
 
+-- FullBright & Dynamic Ambient Engine Thread
 task.spawn(function()
     while task.wait(1) do
         if Config.FullBright then
@@ -478,14 +566,18 @@ task.spawn(function()
     end
 end)
 
+-- Infinite Camera Tracking Zoom Engine Thread
 task.spawn(function()
     while task.wait(0.5) do
         pcall(function()
-            if LocalPlayer then LocalPlayer.CameraMaxZoomDistance = Config.InfiniteZoom and 9e9 or 400 end
+            if LocalPlayer then
+                LocalPlayer.CameraMaxZoomDistance = Config.InfiniteZoom and 9e9 or 400
+            end
         end)
     end
 end)
 
+-- Velocity Neutralizer Anti-Fling Engine Thread
 task.spawn(function()
     while task.wait(0.1) do
         if Config.AntiFling then
@@ -506,26 +598,34 @@ task.spawn(function()
     end
 end)
 
+-- Knockback Vector Dampener Engine Thread
 task.spawn(function()
     while task.wait(0.05) do
         if Config.LessKnockback and LocalPlayer.Character then
             pcall(function()
                 for _, child in ipairs(LocalPlayer.Character:GetDescendants()) do
-                    if child:IsA("BodyVelocity") or child:IsA("LinearVelocity") or child:IsA("BodyForce") then child:Destroy() end
+                    if child:IsA("BodyVelocity") or child:IsA("LinearVelocity") or child:IsA("BodyForce") then
+                        child:Destroy()
+                    end
                 end
                 local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if root and root.Velocity.Magnitude > 65 then root.Velocity = root.Velocity.Unit * 15 end
+                if root and root.Velocity.Magnitude > 65 then
+                    root.Velocity = root.Velocity.Unit * 15
+                end
             end)
         end
     end
 end)
 
+-- Proximity prompt optimization thread
 task.spawn(function()
     while task.wait(0.5) do
         if Config.InstantPrompt then
             pcall(function()
                 for _, prompt in ipairs(workspace:GetDescendants()) do
-                    if prompt:IsA("ProximityPrompt") then prompt.HoldDuration = 0 end
+                    if prompt:IsA("ProximityPrompt") then
+                        prompt.HoldDuration = 0
+                    end
                 end
             end)
         end
@@ -538,17 +638,21 @@ workspace.DescendantAdded:Connect(function(descendant)
     end
 end)
 
+-- Background Streaming Pause Interceptor Engine Thread
 task.spawn(function()
     while task.wait(0.5) do
         pcall(function()
             GuiService:SetGameplayPausedNotificationEnabled(not Config.BypassGameplayPaused)
+            
             if Config.BypassGameplayPaused then
                 local pGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
                 if pGui then
                     for _, node in ipairs(pGui:GetDescendants()) do
                         if node:IsA("TextLabel") and (string.find(node.Text:lower(), "gameplay paused") or string.find(node.Text:lower(), "pausing")) then
                             local rootWindow = node.Parent
-                            if rootWindow and rootWindow:IsA("Frame") then rootWindow.Visible = false end
+                            if rootWindow and rootWindow:IsA("Frame") then
+                                rootWindow.Visible = false
+                            end
                         end
                     end
                 end
@@ -557,6 +661,7 @@ task.spawn(function()
     end
 end)
 
+-- Background Autoclicker Safeguard Thread
 task.spawn(function()
     while task.wait(0.02) do 
         if Config.ProtectionEnabled and Config.PetHuntEnabled then
@@ -575,15 +680,16 @@ task.spawn(function()
                         end
                     end
                 end
-                if playerNearby then executeDualActionStrike(shovel) end
+                
+                if playerNearby then
+                    executeDualActionStrike(shovel)
+                end
             end
         end
     end
 end)
 
--- ---------------------------------------------------------------------
--- MAIN RUNTIME CORE AUTOMATION LIFECYCLE (farm loop & hop)
--- ---------------------------------------------------------------------
+-- UNIFIED HUNTING & SERVER HOPPING WORKER THREAD
 task.spawn(function()
     local lastPromptCheck = 0
     local lastGardenClean = 0
@@ -595,108 +701,20 @@ task.spawn(function()
             removeOtherGardensInstantly()
         end
         
-        if Config.PetHuntEnabled then
+        if Config.PetHuntEnabled and not isProcessingHopLifecycle then
             local character = LocalPlayer.Character
             local rootPart = character and character:FindFirstChild("HumanoidRootPart")
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            
             local mapFolder = workspace:FindFirstChild("Map")
             local wildFolder = mapFolder and mapFolder:FindFirstChild("WildPetSpawns")
             
             if rootPart and wildFolder and humanoid then
+                local activeTarget = nil
                 
-                -- INTERCEPTION OPTION A: SERVER-HOP MODALITY ENABLED
-                if Config.ServerHopEnabled then
-                    if not isProcessingHopLifecycle then
-                        isProcessingHopLifecycle = true
-                        print("[BOT_ENGINE]: Server Hop Routine Initiated. Running synchronization streaming checks...")
-                        
-                        local targetPet = nil
-                        local scanAttempts = 6
-                        
-                        for attempt = 1, scanAttempts do
-                            if not Config.PetHuntEnabled or not Config.ServerHopEnabled then break end
-                            print(string.format("[BOT_ENGINE]: Scanning map boundaries (%d/%d)...", attempt, scanAttempts))
-                            
-                            for _, petModel in ipairs(wildFolder:GetChildren()) do
-                                local attributeName = petModel:GetAttribute("PetName")
-                                if attributeName then
-                                    local internalKey = string.gsub(attributeName, "%s+", "")
-                                    if (Config.TargetPets[attributeName] or Config.TargetPets[internalKey]) and petModel:FindFirstChild("RootPart") then
-                                        targetPet = petModel
-                                        break
-                                    end
-                                end
-                            end
-                            if targetPet then break end
-                            task.wait(0.5)
-                        end
-                        
-                        if targetPet and Config.PetHuntEnabled and Config.ServerHopEnabled then
-                            local petRoot = targetPet.RootPart
-                            local petName = targetPet:GetAttribute("PetName") or targetPet.Name
-                            print("[BOT_ENGINE]: Target signature captured! Locking execution bounds onto: " .. tostring(petName))
-                            
-                            local shovel = character:FindFirstChild("Shovel") or LocalPlayer.Backpack:FindFirstChild("Shovel")
-                            if shovel and shovel.Parent == LocalPlayer.Backpack then
-                                humanoid:EquipTool(shovel)
-                                task.wait(0.1)
-                            end
-                            
-                            while Config.PetHuntEnabled and Config.ServerHopEnabled and targetPet and targetPet:IsDescendantOf(wildFolder) and petRoot do
-                                local closestThief = nil
-                                if Config.ProtectionEnabled then
-                                    for _, player in ipairs(Players:GetPlayers()) do
-                                        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                                            local playerRoot = player.Character.HumanoidRootPart
-                                            local distanceToPet = (playerRoot.Position - petRoot.Position).Magnitude
-                                            if distanceToPet <= Config.ProtectionRadius then
-                                                closestThief = playerRoot
-                                                break
-                                            end
-                                        end
-                                    end
-                                end
-                                
-                                if closestThief then
-                                    executeInterceptionManeuver(closestThief, petRoot)
-                                else
-                                    if Config.TeleportMode == "Teleport" then
-                                        rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
-                                    elseif Config.TeleportMode == "Tween" then
-                                        local dist = (rootPart.Position - (petRoot.Position + Vector3.new(0, Config.FlyHeight, 0))).Magnitude
-                                        if dist > 5 then
-                                            smoothFlyTo(petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0), Config.TweenSpeed)
-                                        else
-                                            rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
-                                        end
-                                    elseif Config.TeleportMode == "Walk" then
-                                        humanoid:MoveTo(petRoot.Position)
-                                    end
-                                    if shovel and shovel.Parent == LocalPlayer.Backpack then humanoid:EquipTool(shovel) end
-                                end
-                                
-                                if os.clock() - lastPromptCheck > 0.05 then
-                                    lastPromptCheck = os.clock()
-                                    deployPurchaseInterception(targetPet, rootPart)
-                                end
-                                task.wait()
-                            end
-                            
-                            print("[BOT_ENGINE]: Capture signature successful! Enforcing 40-second static cooldown before initiating rotation...")
-                            task.wait(40)
-                        else
-                            print("[BOT_ENGINE]: Zero target signatures detected across map boundaries during this session cycle.")
-                        end
-                        
-                        if Config.PetHuntEnabled and Config.ServerHopEnabled then
-                            rotateServerInstance()
-                        end
-                        isProcessingHopLifecycle = false
-                    end
-                    
-                else
-                    -- INTERCEPTION OPTION B: CONTINUOUS INFINITE ROOM STAY FARMING
-                    local activeTarget = nil
+                -- Pet Finder Pre-Scan: Checks multiple times if Hop is enabled to allow streaming buffers
+                local scanAttempts = Config.ServerHopEnabled and 6 or 1
+                for attempt = 1, scanAttempts do
                     for _, petModel in ipairs(wildFolder:GetChildren()) do
                         local attributeName = petModel:GetAttribute("PetName")
                         if attributeName then
@@ -707,69 +725,130 @@ task.spawn(function()
                             end
                         end
                     end
-                    
-                    if activeTarget then
-                        local petRoot = activeTarget.RootPart
-                        local petName = activeTarget:GetAttribute("PetName") or activeTarget.Name
-                        print("[HUNTER]: Safe navigation tracking locked onto " .. tostring(petName))
-                        
-                        local shovel = character:FindFirstChild("Shovel") or LocalPlayer.Backpack:FindFirstChild("Shovel")
-                        if shovel and shovel.Parent == LocalPlayer.Backpack then
-                            humanoid:EquipTool(shovel)
-                            task.wait(0.1)
-                        end
-                        
-                        while Config.PetHuntEnabled and not Config.ServerHopEnabled and activeTarget and activeTarget:IsDescendantOf(wildFolder) and petRoot do
-                            local closestThief = nil
-                            if Config.ProtectionEnabled then
-                                for _, player in ipairs(Players:GetPlayers()) do
-                                    if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                                        local playerRoot = player.Character.HumanoidRootPart
-                                        local distanceToPet = (playerRoot.Position - petRoot.Position).Magnitude
-                                        if distanceToPet <= Config.ProtectionRadius then
-                                            closestThief = playerRoot
-                                            break
-                                        end
-                                    end
-                                end
-                            end
-                            
-                            if closestThief then
-                                executeInterceptionManeuver(closestThief, petRoot)
-                            else
-                                if Config.TeleportMode == "Teleport" then
-                                    rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
-                                elseif Config.TeleportMode == "Tween" then
-                                    local dist = (rootPart.Position - (petRoot.Position + Vector3.new(0, Config.FlyHeight, 0))).Magnitude
-                                    if dist > 5 then
-                                        smoothFlyTo(petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0), Config.TweenSpeed)
-                                    else
-                                        rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
-                                    end
-                                elseif Config.TeleportMode == "Walk" then
-                                    humanoid:MoveTo(petRoot.Position)
-                                end
-                                if shovel and shovel.Parent == LocalPlayer.Backpack then humanoid:EquipTool(shovel) end
-                            end
-                            
-                            if os.clock() - lastPromptCheck > 0.05 then
-                                lastPromptCheck = os.clock()
-                                deployPurchaseInterception(activeTarget, rootPart)
-                            end
-                            task.wait()
-                        end
-                        deployPurchaseInterception(nil, rootPart)
-                        print("[HUNTER]: Target tracking concluded.")
-                    end
+                    if activeTarget or not Config.ServerHopEnabled then break end
+                    task.wait(0.5)
                 end
                 
+                if activeTarget then
+                    local petRoot = activeTarget.RootPart
+                    local petName = activeTarget:GetAttribute("PetName") or activeTarget.Name
+                    print("[HUNTER]: Safe navigation tracking locked onto " .. tostring(petName))
+                    
+                    local shovel = character:FindFirstChild("Shovel") or LocalPlayer.Backpack:FindFirstChild("Shovel")
+                    if shovel and shovel.Parent == LocalPlayer.Backpack then
+                        humanoid:EquipTool(shovel)
+                        task.wait(0.1) 
+                    end
+                    
+                    local capturedSuccessfully = false
+                    
+                    while Config.PetHuntEnabled and activeTarget and activeTarget:IsDescendantOf(wildFolder) and petRoot do
+                        
+                        local closestThief = nil
+                        if Config.ProtectionEnabled then
+                            for _, player in ipairs(Players:GetPlayers()) do
+                                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                                    local playerRoot = player.Character.HumanoidRootPart
+                                    local distanceToPet = (playerRoot.Position - petRoot.Position).Magnitude
+                                    if distanceToPet <= Config.ProtectionRadius then
+                                        closestThief = playerRoot
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                        
+                        if closestThief then
+                            executeInterceptionManeuver(closestThief, petRoot)
+                        else
+                            -- DYNAMIC MOVEMENT MANAGER INTEGRATION
+                            if Config.TeleportMode == "Teleport" then
+                                rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
+                                
+                            elseif Config.TeleportMode == "Tween" then
+                                local dist = (rootPart.Position - (petRoot.Position + Vector3.new(0, Config.FlyHeight, 0))).Magnitude
+                                if dist > 5 then
+                                    smoothFlyTo(petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0), Config.TweenSpeed)
+                                else
+                                    rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
+                                end
+                                
+                            elseif Config.TeleportMode == "Walk" then
+                                local dist = (rootPart.Position - petRoot.Position).Magnitude
+                                if dist > 6 then
+                                    local path = PathfindingService:CreatePath({
+                                        AgentRadius = 2,
+                                        AgentHeight = 5,
+                                        AgentCanJump = true,
+                                        WaypointSpacing = 4
+                                    })
+                                    local success = pcall(function()
+                                        path:ComputeAsync(rootPart.Position, petRoot.Position)
+                                    end)
+                                    
+                                    if success and path.Status == Enum.PathStatus.Success then
+                                        local waypoints = path:GetWaypoints()
+                                        local numWaypointsToFollow = math.min(#waypoints, 3)
+                                        for i = 1, numWaypointsToFollow do
+                                            local wp = waypoints[i]
+                                            if wp.Action == Enum.PathWaypointAction.Jump then
+                                                humanoid.Jump = true
+                                            end
+                                            humanoid:MoveTo(wp.Position)
+                                            
+                                            local t = 0
+                                            while (rootPart.Position - wp.Position).Magnitude > 3 and t < 0.4 do
+                                                t = t + task.wait(0.02)
+                                            end
+                                        end
+                                    else
+                                        humanoid:MoveTo(petRoot.Position)
+                                    end
+                                else
+                                    humanoid:MoveTo(petRoot.Position)
+                                end
+                            end
+                            
+                            if shovel and shovel.Parent == LocalPlayer.Backpack then
+                                humanoid:EquipTool(shovel)
+                            end
+                        end
+                        
+                        if os.clock() - lastPromptCheck > 0.05 then
+                            lastPromptCheck = os.clock()
+                            deployPurchaseInterception(activeTarget, rootPart)
+                        end
+                        capturedSuccessfully = true
+                        task.wait()
+                    end
+                    
+                    deployPurchaseInterception(nil, rootPart)
+                    print("[HUNTER]: Target tracking concluded.")
+                    
+                    -- Pet Finder: Trigger server rotation post-capture buffer
+                    if capturedSuccessfully and Config.ServerHopEnabled then
+                        isProcessingHopLifecycle = true
+                        print("[PET_FINDER]: Target signature captured! Enforcing 40-second static cooldown before initiating room rotation...")
+                        task.wait(40)
+                        rotateServerInstance()
+                        isProcessingHopLifecycle = false
+                    end
+                else
+                    -- Pet Finder: Empty map detected, execute server hop
+                    if Config.ServerHopEnabled then
+                        isProcessingHopLifecycle = true
+                        print("[PET_FINDER]: Zero target signatures detected across map boundaries during this session cycle.")
+                        rotateServerInstance()
+                        isProcessingHopLifecycle = false
+                    end
+                end
             end
         end
     end
 end)
 
 -- ---------------------------------------------------------------------
--- UI MATRIX CORE LAYOUT CREATOR ENGINE
+-- UI ENGINE CODE ARCHITECTURE (WITH INTERFACE MINIMIZER)
 -- ---------------------------------------------------------------------
 local BaseLayout = {}
 BaseLayout.__index = BaseLayout
@@ -819,7 +898,7 @@ function BaseLayout.new()
     self.ViewContainer.Position = UDim2.new(0, 160, 0, 10)
     self.ViewContainer.BackgroundTransparency = 1
     self.ViewContainer.Parent = self.MainWindow
-    
+
     local MinimizeBtn = Instance.new("TextButton")
     MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
     MinimizeBtn.Position = UDim2.new(1, -34, 0, 8)
@@ -829,11 +908,11 @@ function BaseLayout.new()
     MinimizeBtn.Font = Enum.Font.GothamBold
     MinimizeBtn.TextSize = 12
     MinimizeBtn.Parent = self.MainWindow
-    
+
     local MinCorner = Instance.new("UICorner")
     MinCorner.CornerRadius = UDim.new(0, 6)
     MinCorner.Parent = MinimizeBtn
-    
+
     local RestoreBtn = Instance.new("TextButton")
     RestoreBtn.Size = UDim2.new(0, 85, 0, 30)
     RestoreBtn.Position = UDim2.new(0, 15, 0, 15)
@@ -843,17 +922,23 @@ function BaseLayout.new()
     RestoreBtn.Font = Enum.Font.GothamMedium
     RestoreBtn.TextSize = 12
     RestoreBtn.Visible = false
-    RestoreBtn.ZIndex = 100000
+    RestoreBtn.ZIndex = 100000 
     RestoreBtn.Parent = self.ScreenGui
-    
+
     local RestoreCorner = Instance.new("UICorner")
     RestoreCorner.CornerRadius = UDim.new(0, 6)
     RestoreCorner.Parent = RestoreBtn
-    
+
+    local RestoreStroke = Instance.new("UIStroke")
+    RestoreStroke.Color = Color3.fromRGB(45, 45, 48)
+    RestoreStroke.Thickness = 1
+    RestoreStroke.Parent = RestoreBtn
+
     MinimizeBtn.MouseButton1Click:Connect(function()
         self.MainWindow.Visible = false
         RestoreBtn.Visible = true
     end)
+
     RestoreBtn.MouseButton1Click:Connect(function()
         self.MainWindow.Visible = true
         RestoreBtn.Visible = false
@@ -919,407 +1004,717 @@ function Sidebar:RegisterTab(tabName, iconText, associatedViewFrame)
     local Btn = Instance.new("TextButton")
     Btn.Size = UDim2.new(1, 0, 0, 34)
     Btn.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
-    Btn.Text = " " .. iconText .. "  " .. tabName
+    Btn.Text = "    " .. iconText .. "  " .. tabName
     Btn.TextColor3 = Color3.fromRGB(160, 160, 165)
     Btn.Font = Enum.Font.GothamMedium
     Btn.TextSize = 12
     Btn.TextXAlignment = Enum.TextXAlignment.Left
+    Btn.LayoutOrder = order
     Btn.Parent = self.Container
     
     local BtnCorner = Instance.new("UICorner")
     BtnCorner.CornerRadius = UDim.new(0, 6)
     BtnCorner.Parent = Btn
     
-    table.insert(self.Buttons, Btn)
+    local ActiveStrip = Instance.new("Frame")
+    ActiveStrip.Name = "ActiveStrip"
+    ActiveStrip.Size = UDim2.new(0, 3, 0, 16)
+    ActiveStrip.Position = UDim2.new(0, 6, 0.5, -8)
+    ActiveStrip.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ActiveStrip.BorderSizePixel = 0
+    ActiveStrip.Visible = false
+    ActiveStrip.Parent = Btn
     
     Btn.MouseButton1Click:Connect(function()
-        for _, otherBtn in ipairs(self.Buttons) do
+        for name, view in pairs(self.Tabs) do view.Visible = (name == tabName) end
+        for _, otherBtn in pairs(self.Buttons) do
             otherBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
             otherBtn.TextColor3 = Color3.fromRGB(160, 160, 165)
+            local strip = otherBtn:FindFirstChild("ActiveStrip")
+            if strip then strip.Visible = false end
         end
-        Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+        Btn.BackgroundColor3 = Color3.fromRGB(32, 32, 36)
         Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        
-        for _, view in pairs(self.Tabs) do view.Visible = false end
-        associatedViewFrame.Visible = true
+        ActiveStrip.Visible = true
     end)
     
+    table.insert(self.Buttons, Btn)
+    
     if order == 1 then
-        Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
-        Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         associatedViewFrame.Visible = true
+        Btn.BackgroundColor3 = Color3.fromRGB(32, 32, 36)
+        Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ActiveStrip.Visible = true
     else
         associatedViewFrame.Visible = false
     end
 end
 
 -- ---------------------------------------------------------------------
--- COMPONENT RENDER ENGINE FACTORY
+-- INTERFACE RENDERING ENGINE MATRIX
 -- ---------------------------------------------------------------------
 local ViewCreator = {}
 
-function ViewCreator.CreateScrollFrame(parent)
-    local sf = Instance.new("ScrollingFrame")
-    sf.Size = UDim2.new(1, 0, 1, 0)
-    sf.BackgroundTransparency = 1
-    sf.BorderSizePixel = 0
-    sf.ScrollBarThickness = 4
-    sf.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 65)
-    sf.Parent = parent
+function ViewCreator.SetupCanvas(titleName, viewContainer)
+    local ViewFrame = Instance.new("Frame")
+    ViewFrame.Size = UDim2.new(1, 0, 1, 0)
+    ViewFrame.BackgroundTransparency = 1
+    ViewFrame.Visible = false
+    ViewFrame.Parent = viewContainer
     
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 6)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Parent = sf
+    local HeaderTitle = Instance.new("TextLabel")
+    HeaderTitle.Size = UDim2.new(1, -40, 0, 32)
+    HeaderTitle.Position = UDim2.new(0, 0, 0, 5)
+    HeaderTitle.BackgroundTransparency = 1
+    HeaderTitle.Text = titleName
+    HeaderTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    HeaderTitle.TextSize = 22
+    HeaderTitle.Font = Enum.Font.GothamBold
+    HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
+    HeaderTitle.Parent = ViewFrame
     
-    local pad = Instance.new("UIPadding")
-    pad.PaddingLeft = UDim.new(0, 4)
-    pad.PaddingRight = UDim.new(0, 12)
-    pad.PaddingTop = UDim.new(0, 4)
-    pad.PaddingBottom = UDim.new(0, 4)
-    pad.Parent = sf
+    local Scroll = Instance.new("ScrollingFrame")
+    Scroll.Size = UDim2.new(1, 0, 1, -45)
+    Scroll.Position = UDim2.new(0, 0, 0, 45)
+    Scroll.BackgroundTransparency = 1
+    Scroll.BorderSizePixel = 0
+    Scroll.ScrollBarThickness = 4
+    Scroll.ScrollBarImageColor3 = Color3.fromRGB(65, 65, 70)
+    Scroll.Parent = ViewFrame
     
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        sf.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 15)
+    local ListLayout = Instance.new("UIListLayout")
+    ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ListLayout.Padding = UDim.new(0, 6)
+    ListLayout.Parent = Scroll
+    
+    ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        Scroll.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 12)
     end)
-    return sf
+    
+    return ViewFrame, Scroll
 end
 
-function ViewCreator.AddSectionHeader(scroll, text)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, 0, 0, 24)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text:upper()
-    lbl.TextColor3 = Color3.fromRGB(130, 130, 135)
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 10
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = scroll
+function ViewCreator.AddSectionHeader(scrollTarget, text)
+    local SectionFrame = Instance.new("Frame")
+    SectionFrame.Size = UDim2.new(1, -8, 0, 24)
+    SectionFrame.BackgroundTransparency = 1
+    SectionFrame.Parent = scrollTarget
+    
+    local HeaderLabel = Instance.new("TextLabel")
+    HeaderLabel.Size = UDim2.new(1, 0, 1, 0)
+    HeaderLabel.BackgroundTransparency = 1
+    HeaderLabel.Text = "— [ " .. text .. " ] —"
+    HeaderLabel.TextColor3 = Color3.fromRGB(180, 75, 75)
+    HeaderLabel.TextSize = 12
+    HeaderLabel.Font = Enum.Font.GothamBold
+    HeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
+    HeaderLabel.Parent = SectionFrame
 end
 
-function ViewCreator.AddToggleCard(scroll, text, default, callback, configKey)
-    local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, 0, 0, 40)
-    card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
-    card.BorderSizePixel = 0
-    card.Parent = scroll
+function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickEvent, registryKey)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, -8, 0, 42)
+    Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+    Card.BorderSizePixel = 0
+    Card.Parent = scrollTarget
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = card
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 8)
+    CardCorner.Parent = Card
     
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -60, 1, 0)
-    lbl.Position = UDim2.new(0, 12, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(220, 220, 225)
-    lbl.Font = Enum.Font.GothamMedium
-    lbl.TextSize = 12
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = card
+    local CardTitle = Instance.new("TextLabel")
+    CardTitle.Size = UDim2.new(0.7, 0, 1, 0)
+    CardTitle.Position = UDim2.new(0, 12, 0, 0)
+    CardTitle.BackgroundTransparency = 1
+    CardTitle.Text = labelText
+    CardTitle.TextColor3 = Color3.fromRGB(230, 230, 235)
+    CardTitle.TextSize = 13
+    CardTitle.Font = Enum.Font.GothamMedium
+    CardTitle.TextXAlignment = Enum.TextXAlignment.Left
+    CardTitle.Parent = Card
     
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 44, 0, 22)
-    btn.Position = UDim2.new(1, -56, 0.5, -11)
-    btn.BackgroundColor3 = default and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(50, 50, 55)
-    btn.Text = ""
-    btn.Parent = card
+    local ToggleFrame = Instance.new("TextButton")
+    ToggleFrame.Size = UDim2.new(0, 42, 0, 20)
+    ToggleFrame.Position = UDim2.new(1, -54, 0.5, -10)
+    ToggleFrame.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
+    ToggleFrame.Text = ""
+    ToggleFrame.Parent = Card
     
-    local bcorner = Instance.new("UICorner")
-    bcorner.CornerRadius = UDim.new(0, 11)
-    bcorner.Parent = btn
+    local ToggleCorner = Instance.new("UICorner")
+    ToggleCorner.CornerRadius = UDim.new(1, 0)
+    ToggleCorner.Parent = ToggleFrame
     
-    local circle = Instance.new("Frame")
-    circle.Size = UDim2.new(0, 18, 0, 18)
-    circle.Position = default and UDim2.new(1, -20, 0, 2) or UDim2.new(0, 2, 0, 2)
-    circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    circle.BorderSizePixel = 0
-    circle.Parent = btn
+    local SliderDot = Instance.new("Frame")
+    SliderDot.Size = UDim2.new(0, 14, 0, 14)
+    SliderDot.Position = UDim2.new(0, 3, 0.5, -7)
+    SliderDot.BackgroundColor3 = Color3.fromRGB(150, 150, 155)
+    SliderDot.BorderSizePixel = 0
+    SliderDot.Parent = ToggleFrame
     
-    local ccorner = Instance.new("UICorner")
-    ccorner.CornerRadius = UDim.new(0, 9)
-    ccorner.Parent = circle
+    local DotCorner = Instance.new("UICorner")
+    DotCorner.CornerRadius = UDim.new(1, 0)
+    DotCorner.Parent = SliderDot
     
-    local state = default
-    local function updateVisuals(b)
-        state = b
-        if configKey then Config[configKey] = b end
-        btn.BackgroundColor3 = b and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(50, 50, 55)
-        TweenService:Create(circle, TweenInfo.new(0.15), {
-            Position = b and UDim2.new(1, -20, 0, 2) or UDim2.new(0, 2, 0, 2)
-        }):Play()
+    local currentState = checkState
+    local function updateVisuals(enabled)
+        currentState = enabled
+        if enabled then
+            ToggleFrame.BackgroundColor3 = Color3.fromRGB(0, 180, 110)
+            SliderDot.Position = UDim2.new(1, -17, 0.5, -7)
+            SliderDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        else
+            ToggleFrame.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
+            SliderDot.Position = UDim2.new(0, 3, 0.5, -7)
+            SliderDot.BackgroundColor3 = Color3.fromRGB(150, 150, 155)
+        end
     end
     
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        updateVisuals(state)
-        callback(state)
-    end)
+    if registryKey then ToggleRegistry[registryKey] = updateVisuals end
+    updateVisuals(currentState)
     
-    if configKey then ToggleRegistry[configKey] = updateVisuals end
-end
-
-function ViewCreator.AddInputCard(scroll, text, default, callback, configKey)
-    local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, 0, 0, 40)
-    card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
-    card.BorderSizePixel = 0
-    card.Parent = scroll
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = card
-    
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0.5, 0, 1, 0)
-    lbl.Position = UDim2.new(0, 12, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(220, 220, 225)
-    lbl.Font = Enum.Font.GothamMedium
-    lbl.TextSize = 12
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = card
-    
-    local tb = Instance.new("TextBox")
-    tb.Size = UDim2.new(0.4, 0, 0, 26)
-    tb.Position = UDim2.new(1, -12, 0.5, -13)
-    tb.AnchorPoint = Vector2.new(1, 0)
-    tb.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    tb.BorderSizePixel = 0
-    tb.Text = tostring(default)
-    tb.TextColor3 = Color3.fromRGB(255, 255, 255)
-    tb.Font = Enum.Font.Gotham
-    tb.TextSize = 12
-    tb.ClearTextOnFocus = false
-    tb.Parent = card
-    
-    local tbcorner = Instance.new("UICorner")
-    tbcorner.CornerRadius = UDim.new(0, 4)
-    tbcorner.Parent = tb
-    
-    tb.FocusLost:Connect(function()
-        local val = tb.Text
-        if tonumber(val) then val = tonumber(val) end
-        if configKey then Config[configKey] = val end
-        callback(val)
+    ToggleFrame.MouseButton1Click:Connect(function()
+        currentState = not currentState
+        updateVisuals(currentState)
+        onClickEvent(currentState)
     end)
 end
 
-function ViewCreator.AddSingleDropdownCard(scroll, text, current, options, callback, configKey)
-    local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, 0, 0, 40)
-    card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
-    card.BorderSizePixel = 0
-    card.Parent = scroll
+function ViewCreator.AddActionCard(scrollTarget, labelText, buttonText, onClickEvent)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, -8, 0, 42)
+    Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+    Card.BorderSizePixel = 0
+    Card.Parent = scrollTarget
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = card
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 8)
+    CardCorner.Parent = Card
     
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0.5, 0, 1, 0)
-    lbl.Position = UDim2.new(0, 12, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(220, 220, 225)
-    lbl.Font = Enum.Font.GothamMedium
-    lbl.TextSize = 12
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = card
+    local CardTitle = Instance.new("TextLabel")
+    CardTitle.Size = UDim2.new(0.6, 0, 1, 0)
+    CardTitle.Position = UDim2.new(0, 12, 0, 0)
+    CardTitle.BackgroundTransparency = 1
+    CardTitle.Text = labelText
+    CardTitle.TextColor3 = Color3.fromRGB(230, 230, 235)
+    CardTitle.TextSize = 13
+    CardTitle.Font = Enum.Font.GothamMedium
+    CardTitle.TextXAlignment = Enum.TextXAlignment.Left
+    CardTitle.Parent = Card
     
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.4, 0, 0, 26)
-    btn.Position = UDim2.new(1, -12, 0.5, -13)
-    btn.AnchorPoint = Vector2.new(1, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    btn.Text = tostring(current)
-    btn.TextColor3 = Color3.fromRGB(200, 200, 205)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 12
-    btn.Parent = card
+    local ActionBtn = Instance.new("TextButton")
+    ActionBtn.Size = UDim2.new(0, 70, 0, 24)
+    ActionBtn.Position = UDim2.new(1, -82, 0.5, -12)
+    ActionBtn.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
+    ActionBtn.Text = buttonText
+    ActionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ActionBtn.Font = Enum.Font.GothamBold
+    ActionBtn.TextSize = 10
+    ActionBtn.Parent = Card
     
-    local bcorner = Instance.new("UICorner")
-    bcorner.CornerRadius = UDim.new(0, 4)
-    bcorner.Parent = btn
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+    BtnCorner.Parent = ActionBtn
     
-    local index = 1
-    for i, opt in ipairs(options) do
-        if opt == current then index = i break end
+    ActionBtn.MouseButton1Click:Connect(onClickEvent)
+end
+
+function ViewCreator.AddInputCard(scrollTarget, labelText, defaultText, onTextChange, registryKey)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, -8, 0, 42)
+    Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+    Card.BorderSizePixel = 0
+    Card.Parent = scrollTarget
+    
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 8)
+    CardCorner.Parent = Card
+    
+    local CardTitle = Instance.new("TextLabel")
+    CardTitle.Size = UDim2.new(0.5, 0, 1, 0)
+    CardTitle.Position = UDim2.new(0, 12, 0, 0)
+    CardTitle.BackgroundTransparency = 1
+    CardTitle.Text = labelText
+    CardTitle.TextColor3 = Color3.fromRGB(230, 230, 235)
+    CardTitle.TextSize = 13
+    CardTitle.Font = Enum.Font.GothamMedium
+    CardTitle.TextXAlignment = Enum.TextXAlignment.Left
+    CardTitle.Parent = Card
+    
+    local TextBox = Instance.new("TextBox")
+    TextBox.Size = UDim2.new(0.42, 0, 0, 26)
+    TextBox.Position = UDim2.new(1, -192, 0.5, -13)
+    TextBox.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
+    TextBox.Text = defaultText or ""
+    TextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TextBox.PlaceholderText = "..."
+    TextBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 105)
+    TextBox.Font = Enum.Font.Gotham
+    TextBox.TextSize = 12
+    TextBox.ClearTextOnFocus = false
+    TextBox.Parent = Card
+    
+    local BoxCorner = Instance.new("UICorner")
+    BoxCorner.CornerRadius = UDim.new(0, 6)
+    BoxCorner.Parent = TextBox
+    
+    local function updateVisuals(txt)
+        TextBox.Text = tostring(txt)
+    end
+    if registryKey then ToggleRegistry[registryKey] = updateVisuals end
+    
+    TextBox.FocusLost:Connect(function() onTextChange(TextBox.Text) end)
+end
+
+function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optionsList, onSelect, registryKey)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, -8, 0, 42)
+    Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+    Card.BorderSizePixel = 0
+    Card.Parent = scrollTarget
+    
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 8)
+    CardCorner.Parent = Card
+    
+    local CardTitle = Instance.new("TextLabel")
+    CardTitle.Size = UDim2.new(0.5, 0, 1, 0)
+    CardTitle.Position = UDim2.new(0, 12, 0, 0)
+    CardTitle.BackgroundTransparency = 1
+    CardTitle.Text = labelText
+    CardTitle.TextColor3 = Color3.fromRGB(230, 230, 235)
+    CardTitle.TextSize = 13
+    CardTitle.Font = Enum.Font.GothamMedium
+    CardTitle.TextXAlignment = Enum.TextXAlignment.Left
+    CardTitle.Parent = Card
+    
+    local DropdownBtn = Instance.new("TextButton")
+    DropdownBtn.Size = UDim2.new(0.42, 0, 0, 26)
+    DropdownBtn.Position = UDim2.new(1, -192, 0.5, -13)
+    DropdownBtn.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
+    DropdownBtn.Text = defaultText or "Select Options"
+    DropdownBtn.TextColor3 = Color3.fromRGB(220, 220, 225)
+    DropdownBtn.Font = Enum.Font.Gotham
+    DropdownBtn.TextSize = 12
+    DropdownBtn.TextTruncate = Enum.TextTruncate.AtEnd
+    DropdownBtn.Parent = Card
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+    BtnCorner.Parent = DropdownBtn
+    
+    local DropdownList = Instance.new("ScrollingFrame")
+    DropdownList.Size = UDim2.new(0, 180, 0, 120)
+    DropdownList.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    DropdownList.BorderSizePixel = 0
+    DropdownList.ScrollBarThickness = 4
+    DropdownList.ScrollBarImageColor3 = Color3.fromRGB(70, 70, 75)
+    DropdownList.Visible = false
+    DropdownList.ZIndex = 5000
+    
+    local ListCorner = Instance.new("UICorner")
+    ListCorner.CornerRadius = UDim.new(0, 6)
+    ListCorner.Parent = DropdownList
+    
+    local ListStroke = Instance.new("UIStroke")
+    ListStroke.Color = Color3.fromRGB(48, 48, 54)
+    ListStroke.Thickness = 1
+    ListStroke.Parent = DropdownList
+
+    local ListLayout = Instance.new("UIListLayout")
+    ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ListLayout.Padding = UDim.new(0, 1)
+    ListLayout.Parent = DropdownList
+    
+    task.spawn(function()
+        local screenGui = scrollTarget:FindFirstAncestorOfClass("ScreenGui")
+        while not screenGui do
+            task.wait(0.1)
+            screenGui = scrollTarget:FindFirstAncestorOfClass("ScreenGui")
+        end
+        DropdownList.Parent = screenGui
+    end)
+    
+    local isOpen = false
+    local function toggleDropdown()
+        isOpen = not isOpen
+        if isOpen then
+            DropdownList.Position = UDim2.new(0, DropdownBtn.AbsolutePosition.X, 0, DropdownBtn.AbsolutePosition.Y + DropdownBtn.AbsoluteSize.Y + 3)
+            DropdownList.Size = UDim2.new(0, DropdownBtn.AbsoluteSize.X, 0, math.min(#optionsList * 26 + 4, 150))
+            DropdownList.Visible = true
+        else
+            DropdownList.Visible = false
+        end
     end
     
-    btn.MouseButton1Click:Connect(function()
-        index = index + 1
-        if index > #options then index = 1 end
-        local selected = options[index]
-        btn.Text = tostring(selected)
-        if configKey then Config[configKey] = selected end
-        callback(selected)
+    DropdownBtn.MouseButton1Click:Connect(toggleDropdown)
+    DropdownBtn:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+        if isOpen then
+            DropdownList.Position = UDim2.new(0, DropdownBtn.AbsolutePosition.X, 0, DropdownBtn.AbsolutePosition.Y + DropdownBtn.AbsoluteSize.Y + 3)
+        end
     end)
+    
+    local activeSelections = {}
+    
+    local function parseInitialState(txt)
+        table.clear(activeSelections)
+        if txt and txt ~= "Select Options" and txt ~= "None" and txt ~= "" then
+            for token in string.gmatch(txt, "[^,%s]+") do
+                activeSelections[token] = true
+            end
+        end
+    end
+    
+    parseInitialState(defaultText)
+    
+    local optionVisualUpdaters = {}
+    
+    local function updateMainButtonText()
+        local count = 0
+        local names = {}
+        for name, _ in pairs(activeSelections) do
+            table.insert(names, name)
+            count = count + 1
+        end
+        
+        local finalString = ""
+        if count == 0 then
+            finalString = "Select Options"
+            DropdownBtn.Text = finalString
+        elseif count == 1 then
+            finalString = names[1]
+            DropdownBtn.Text = finalString
+        else
+            finalString = table.concat(names, ", ")
+            DropdownBtn.Text = count .. " Selected"
+        end
+        
+        onSelect(finalString)
+    end
+    
+    local function externalUpdateHandler(txt)
+        parseInitialState(txt)
+        for _, updater in pairs(optionVisualUpdaters) do updater() end
+        updateMainButtonText()
+    end
+    
+    if registryKey then ToggleRegistry[registryKey] = externalUpdateHandler end
+    
+    for i, option in ipairs(optionsList) do
+        local OptBtn = Instance.new("TextButton")
+        OptBtn.Size = UDim2.new(1, 0, 0, 26)
+        OptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+        OptBtn.BorderSizePixel = 0
+        OptBtn.Font = Enum.Font.Gotham
+        OptBtn.TextSize = 12
+        OptBtn.TextXAlignment = Enum.TextXAlignment.Left
+        OptBtn.LayoutOrder = i
+        OptBtn.ZIndex = 5001
+        OptBtn.Parent = DropdownList
+        
+        optionVisualUpdaters[option] = function()
+            if activeSelections[option] then
+                OptBtn.Text = "  ✓  " .. option
+                OptBtn.TextColor3 = Color3.fromRGB(100, 255, 150)
+            else
+                OptBtn.Text = "      " .. option
+                OptBtn.TextColor3 = Color3.fromRGB(190, 190, 195)
+            end
+        end
+        optionVisualUpdaters[option]()
+        
+        OptBtn.MouseEnter:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(38, 38, 44) end)
+        OptBtn.MouseLeave:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32) end)
+        
+        OptBtn.MouseButton1Click:Connect(function()
+            if option == "None" then
+                table.clear(activeSelections)
+            else
+                activeSelections["None"] = nil
+                if activeSelections[option] then
+                    activeSelections[option] = nil
+                else
+                    activeSelections[option] = true
+                end
+            end
+            
+            for _, updater in pairs(optionVisualUpdaters) do updater() end
+            updateMainButtonText()
+        end)
+    end
+    updateMainButtonText()
 end
 
-ViewCreator.AddDropdownCard = ViewCreator.AddSingleDropdownCard
+-- ADVANCED SINGLE DROPDOWN COMPONENT (FOR SETTINGS & MODE MANAGER)
+function ViewCreator.AddSingleDropdownCard(scrollTarget, labelText, defaultText, optionsList, onSelect, registryKey)
+    local Card = Instance.new("Frame")
+    Card.Size = UDim2.new(1, -8, 0, 42)
+    Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+    Card.BorderSizePixel = 0
+    Card.Parent = scrollTarget
+    
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 8)
+    CardCorner.Parent = Card
+    
+    local CardTitle = Instance.new("TextLabel")
+    CardTitle.Size = UDim2.new(0.5, 0, 1, 0)
+    CardTitle.Position = UDim2.new(0, 12, 0, 0)
+    CardTitle.BackgroundTransparency = 1
+    CardTitle.Text = labelText
+    CardTitle.TextColor3 = Color3.fromRGB(230, 230, 235)
+    CardTitle.TextSize = 13
+    CardTitle.Font = Enum.Font.GothamMedium
+    CardTitle.TextXAlignment = Enum.TextXAlignment.Left
+    CardTitle.Parent = Card
+    
+    local DropdownBtn = Instance.new("TextButton")
+    DropdownBtn.Size = UDim2.new(0.42, 0, 0, 26)
+    DropdownBtn.Position = UDim2.new(1, -192, 0.5, -13)
+    DropdownBtn.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
+    DropdownBtn.Text = defaultText or "Select Option"
+    DropdownBtn.TextColor3 = Color3.fromRGB(220, 220, 225)
+    DropdownBtn.Font = Enum.Font.Gotham
+    DropdownBtn.TextSize = 12
+    DropdownBtn.TextTruncate = Enum.TextTruncate.AtEnd
+    DropdownBtn.Parent = Card
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+    BtnCorner.Parent = DropdownBtn
+    
+    local DropdownList = Instance.new("ScrollingFrame")
+    DropdownList.Size = UDim2.new(0, 180, 0, 120)
+    DropdownList.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    DropdownList.BorderSizePixel = 0
+    DropdownList.ScrollBarThickness = 4
+    DropdownList.ScrollBarImageColor3 = Color3.fromRGB(70, 70, 75)
+    DropdownList.Visible = false
+    DropdownList.ZIndex = 5000
+    
+    local ListCorner = Instance.new("UICorner")
+    ListCorner.CornerRadius = UDim.new(0, 6)
+    ListCorner.Parent = DropdownList
+    
+    local ListStroke = Instance.new("UIStroke")
+    ListStroke.Color = Color3.fromRGB(48, 48, 54)
+    ListStroke.Thickness = 1
+    ListStroke.Parent = DropdownList
 
-function ViewCreator.AddActionCard(scroll, text, buttonText, callback)
-    local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, 0, 0, 40)
-    card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
-    card.BorderSizePixel = 0
-    card.Parent = scroll
+    local ListLayout = Instance.new("UIListLayout")
+    ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ListLayout.Padding = UDim.new(0, 1)
+    ListLayout.Parent = DropdownList
     
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = card
+    task.spawn(function()
+        local screenGui = scrollTarget:FindFirstAncestorOfClass("ScreenGui")
+        while not screenGui do
+            task.wait(0.1)
+            screenGui = scrollTarget:FindFirstAncestorOfClass("ScreenGui")
+        end
+        DropdownList.Parent = screenGui
+    end)
     
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0.5, 0, 1, 0)
-    lbl.Position = UDim2.new(0, 12, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(220, 220, 225)
-    lbl.Font = Enum.Font.GothamMedium
-    lbl.TextSize = 12
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = card
+    local isOpen = false
+    local function toggleDropdown()
+        isOpen = not isOpen
+        if isOpen then
+            DropdownList.Position = UDim2.new(0, DropdownBtn.AbsolutePosition.X, 0, DropdownBtn.AbsolutePosition.Y + DropdownBtn.AbsoluteSize.Y + 3)
+            DropdownList.Size = UDim2.new(0, DropdownBtn.AbsoluteSize.X, 0, math.min(#optionsList * 26 + 4, 150))
+            DropdownList.Visible = true
+        else
+            DropdownList.Visible = false
+        end
+    end
     
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.4, 0, 0, 26)
-    btn.Position = UDim2.new(1, -12, 0.5, -13)
-    btn.AnchorPoint = Vector2.new(1, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(52, 152, 219)
-    btn.Text = buttonText
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 11
-    btn.Parent = card
+    DropdownBtn.MouseButton1Click:Connect(toggleDropdown)
+    DropdownBtn:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+        if isOpen then
+            DropdownList.Position = UDim2.new(0, DropdownBtn.AbsolutePosition.X, 0, DropdownBtn.AbsolutePosition.Y + DropdownBtn.AbsoluteSize.Y + 3)
+        end
+    end)
     
-    local bcorner = Instance.new("UICorner")
-    bcorner.CornerRadius = UDim.new(0, 4)
-    bcorner.Parent = btn
+    local currentSelection = defaultText
+    local optionVisualUpdaters = {}
     
-    btn.MouseButton1Click:Connect(callback)
+    local function updateMainButtonText()
+        DropdownBtn.Text = currentSelection or "Select Option"
+        onSelect(currentSelection)
+    end
+    
+    local function externalUpdateHandler(val)
+        currentSelection = val
+        for _, updater in pairs(optionVisualUpdaters) do updater() end
+        DropdownBtn.Text = currentSelection or "Select Option"
+    end
+    
+    if registryKey then ToggleRegistry[registryKey] = externalUpdateHandler end
+    
+    for i, option in ipairs(optionsList) do
+        local OptBtn = Instance.new("TextButton")
+        OptBtn.Size = UDim2.new(1, 0, 0, 26)
+        OptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+        OptBtn.BorderSizePixel = 0
+        OptBtn.Font = Enum.Font.Gotham
+        OptBtn.TextSize = 12
+        OptBtn.TextXAlignment = Enum.TextXAlignment.Left
+        OptBtn.LayoutOrder = i
+        OptBtn.ZIndex = 5001
+        OptBtn.Parent = DropdownList
+        
+        optionVisualUpdaters[option] = function()
+            if currentSelection == option then
+                OptBtn.Text = "  ✓  " .. option
+                OptBtn.TextColor3 = Color3.fromRGB(100, 255, 150)
+            else
+                OptBtn.Text = "      " .. option
+                OptBtn.TextColor3 = Color3.fromRGB(190, 190, 195)
+            end
+        end
+        optionVisualUpdaters[option]()
+        
+        OptBtn.MouseEnter:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(38, 38, 44) end)
+        OptBtn.MouseLeave:Connect(function() OptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32) end)
+        
+        OptBtn.MouseButton1Click:Connect(function()
+            currentSelection = option
+            for _, updater in pairs(optionVisualUpdaters) do updater() end
+            updateMainButtonText()
+            toggleDropdown()
+        end)
+    end
+    updateMainButtonText()
 end
 
 -- ---------------------------------------------------------------------
--- INITIALIZE INTERFACE ASSEMBLY
+-- RUNTIME DEPLOYMENT ENGINE
 -- ---------------------------------------------------------------------
-local UI = BaseLayout.new()
-local Nav = Sidebar.new(UI.Sidebar)
+local App = BaseLayout.new()
+local Nav = Sidebar.new(App.Sidebar)
 
-local HuntView = Instance.new("Frame")
-HuntView.Size = UDim2.new(1, 0, 1, 0)
-HuntView.BackgroundTransparency = 1
-HuntView.Parent = UI.ViewContainer
-
-local MiscView = Instance.new("Frame")
-MiscView.Size = UDim2.new(1, 0, 1, 0)
-MiscView.BackgroundTransparency = 1
-MiscView.Parent = UI.ViewContainer
-
-local SettingsView = Instance.new("Frame")
-SettingsView.Size = UDim2.new(1, 0, 1, 0)
-SettingsView.BackgroundTransparency = 1
-SettingsView.Parent = UI.ViewContainer
-
-local ConfigView = Instance.new("Frame")
-ConfigView.Size = UDim2.new(1, 0, 1, 0)
-ConfigView.BackgroundTransparency = 1
-ConfigView.Parent = UI.ViewContainer
-
-local HuntScroll = ViewCreator.CreateScrollFrame(HuntView)
-local MiscScroll = ViewCreator.CreateScrollFrame(MiscView)
-local SettingsScroll = ViewCreator.CreateScrollFrame(SettingsView)
-local ConfigScroll = ViewCreator.CreateScrollFrame(ConfigView)
+-- Build Core Tabs Canvas Arrays
+local HuntView, HuntScroll = ViewCreator.SetupCanvas("Pet Interception System", App.ViewContainer)
+local MiscView, MiscScroll = ViewCreator.SetupCanvas("More FPS & Optimization", App.ViewContainer)
+local SettingsView, SettingsScroll = ViewCreator.SetupCanvas("Core Navigation Engine", App.ViewContainer)
+local ConfigView, ConfigScroll = ViewCreator.SetupCanvas("Config Manager (JSON)", App.ViewContainer)
 
 -- ---------------------------------------------------------------------
--- TAB 1: PET HUNTER CONFIGURATION (WITH HOP INTELLIGENCE)
+-- TAB 1: PET HUNTER ENGINE CONFIGURATION
 -- ---------------------------------------------------------------------
-ViewCreator.AddSectionHeader(HuntScroll, "Automation Parameters")
 
-ViewCreator.AddToggleCard(HuntScroll, "Enable Master Pet Hunter", Config.PetHuntEnabled, function(bool)
+-- WILD PET SECTION
+ViewCreator.AddSectionHeader(HuntScroll, "Wild Pet")
+
+ViewCreator.AddToggleCard(HuntScroll, "⭐ ENABLE AUTO PET HUNT", Config.PetHuntEnabled, function(bool)
     Config.PetHuntEnabled = bool
 end, "PetHuntEnabled")
 
-ViewCreator.AddSectionHeader(HuntScroll, "Wild Pet Selections")
+ViewCreator.AddToggleCard(HuntScroll, "🛡️ PET PURCHASE PROTECTION", Config.ProtectionEnabled, function(bool)
+    Config.ProtectionEnabled = bool
+end, "ProtectionEnabled")
 
-local petOrder = {
-    "Bunny", "Frog", "Owl", "Deer", "Robin", "Turtle", "Bee",
-    "Raccoon", "Monkey", "Unicorn", "GoldenDragonfly", "Bear", "BlackDragon", "IceSerpent"
-}
-for _, petName in ipairs(petOrder) do
-    ViewCreator.AddToggleCard(HuntScroll, "Target: " .. petName, Config.TargetPets[petName], function(bool)
-        Config.TargetPets[petName] = bool
-    end, "Pet_" .. petName)
+for _, petData in ipairs(Database) do
+    local displayName = petData[1]
+    local configKey = petData[2]
+    local details = petData[3] or petData[2]
+    if not petData[3] then configKey = displayName end
+    
+    ViewCreator.AddToggleCard(HuntScroll, "Target: " .. displayName .. " [" .. details .. "]", Config.TargetPets[configKey], function(bool)
+        Config.TargetPets[configKey] = bool
+    end, "Pet_" .. configKey)
 end
 
-ViewCreator.AddSectionHeader(HuntScroll, "Pet Finder Settings")
+-- PET FINDER (SERVER HOPPING) SECTION
+ViewCreator.AddSectionHeader(HuntScroll, "Pet Finder")
 
-ViewCreator.AddToggleCard(HuntScroll, "Server Hop Automation", Config.ServerHopEnabled, function(bool)
+ViewCreator.AddToggleCard(HuntScroll, "🔄 Enable Automated Server Hopping", Config.ServerHopEnabled, function(bool)
     Config.ServerHopEnabled = bool
 end, "ServerHopEnabled")
 
-ViewCreator.AddInputCard(HuntScroll, "Max Server Players Limit", Config.MaxServerPlayers, function(val)
+ViewCreator.AddInputCard(HuntScroll, "Max Server Players Limit", tostring(Config.MaxServerPlayers), function(val)
     Config.MaxServerPlayers = tonumber(val) or 2
 end, "MaxServerPlayers")
 
--- ---------------------------------------------------------------------
--- TAB 2: MISC OPTIMIZATIONS & RENDERING OPTIONS
--- ---------------------------------------------------------------------
-ViewCreator.AddSectionHeader(MiscScroll, "Environmental Filters & Optimization")
+ViewCreator.AddActionCard(HuntScroll, "Manual Trigger Room Rotation", "Hop Server", function()
+    rotateServerInstance()
+end)
 
-ViewCreator.AddToggleCard(MiscScroll, "Auto Clear Unowned Gardens", Config.AutoRemoveOtherGardens, function(bool)
+-- ---------------------------------------------------------------------
+-- TAB 2: MISCELLANEOUS GAMEPLAY & PERFORMANCE ENGINE OPTIONS
+-- ---------------------------------------------------------------------
+ViewCreator.AddSectionHeader(MiscScroll, "Map Controls")
+
+ViewCreator.AddActionCard(MiscScroll, "Remove Other Gardens", "Clean", function()
+    removeOtherGardensInstantly()
+    print("[OPTIMIZATION]: Executed instant targeted memory purge.")
+end)
+
+ViewCreator.AddToggleCard(MiscScroll, "Auto Remove Other Gardens (Loop)", Config.AutoRemoveOtherGardens, function(bool)
     Config.AutoRemoveOtherGardens = bool
+    if bool then removeOtherGardensInstantly() end
 end, "AutoRemoveOtherGardens")
 
-ViewCreator.AddToggleCard(MiscScroll, "FullBright Ambient", Config.FullBright, function(bool)
+ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", function()
+    applyAggressiveLagReduction()
+    print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
+end)
+
+ViewCreator.AddSectionHeader(MiscScroll, "Environment")
+
+ViewCreator.AddToggleCard(MiscScroll, "Full Bright", Config.FullBright, function(bool)
     Config.FullBright = bool
     if not bool then
-        Lighting.Ambient = OriginalLightingSettings.Ambient
-        Lighting.ColorShift_Top = OriginalLightingSettings.ColorShift_Top
-        Lighting.Brightness = OriginalLightingSettings.Brightness
+        pcall(function()
+            Lighting.Ambient = OriginalLightingSettings.Ambient
+            Lighting.ColorShift_Top = OriginalLightingSettings.ColorShift_Top
+            Lighting.Brightness = OriginalLightingSettings.Brightness
+        end)
     end
 end, "FullBright")
 
-ViewCreator.AddToggleCard(MiscScroll, "Infinite Camera Zoom", Config.InfiniteZoom, function(bool)
+ViewCreator.AddToggleCard(MiscScroll, "Infinite Zoom Out", Config.InfiniteZoom, function(bool)
     Config.InfiniteZoom = bool
 end, "InfiniteZoom")
 
-ViewCreator.AddToggleCard(MiscScroll, "Anti-Fling Player Matrix", Config.AntiFling, function(bool)
+ViewCreator.AddSectionHeader(MiscScroll, "Fling")
+
+ViewCreator.AddToggleCard(MiscScroll, "Anti-Fling", Config.AntiFling, function(bool)
     Config.AntiFling = bool
 end, "AntiFling")
 
-ViewCreator.AddToggleCard(MiscScroll, "Dampen Impact Knockback", Config.LessKnockback, function(bool)
+ViewCreator.AddSectionHeader(MiscScroll, "Knockback")
+
+ViewCreator.AddToggleCard(MiscScroll, "Less knockback", Config.LessKnockback, function(bool)
     Config.LessKnockback = bool
 end, "LessKnockback")
 
-ViewCreator.AddToggleCard(MiscScroll, "Instant Proximity Prompts", Config.InstantPrompt, function(bool)
+ViewCreator.AddSectionHeader(MiscScroll, "Prompt")
+
+ViewCreator.AddToggleCard(MiscScroll, "Instant Interact Prompt", Config.InstantPrompt, function(bool)
     Config.InstantPrompt = bool
 end, "InstantPrompt")
 
-ViewCreator.AddToggleCard(MiscScroll, "Bypass Gameplay Paused State", Config.BypassGameplayPaused, function(bool)
+ViewCreator.AddSectionHeader(MiscScroll, "Gameplay Paused")
+
+ViewCreator.AddToggleCard(MiscScroll, "Bypass Gameplay Paused", Config.BypassGameplayPaused, function(bool)
     Config.BypassGameplayPaused = bool
 end, "BypassGameplayPaused")
 
-ViewCreator.AddActionCard(MiscScroll, "Performance Optimization Boost", "Run Optimizer", function()
-    applyAggressiveLagReduction()
-end)
-
 ViewCreator.AddSectionHeader(MiscScroll, "ESP Spawned Pets")
 
-local petOptions = {"IceSerpent", "BlackDragon", "Unicorn", "GoldenDragonfly", "Raccoon", "Bear", "All"}
-ViewCreator.AddDropdownCard(MiscScroll, "Select Pets", Config.ESPSelectedPets, petOptions, function(txt)
-    Config.ESPSelectedPets = txt
+local petOptions = {"None", "Raccoon", "Robin", "Frog", "Bunny", "Deer", "Owl", "Bee", "Unicorn", "GoldenDragonfly", "IceSerpent"}
+local rarityOptions = {"None", "Epic", "Legendary", "Mythic", "Super", "Rare", "Uncommon", "Common"}
+local sizeOptions = {"None", "Big", "Huge"}
+
+ViewCreator.AddDropdownCard(MiscScroll, "Select Pets", Config.ESPSelectedPets, petOptions, function(selectedValue)
+    Config.ESPSelectedPets = selectedValue
 end, "ESPSelectedPets")
 
-local rarityOptions = {"Super", "Mythic", "Legendary", "Rare", "Uncommon", "Common", "All"}
-ViewCreator.AddDropdownCard(MiscScroll, "Select Rarity Pets", Config.ESPSelectedRarities, rarityOptions, function(txt)
-    Config.ESPSelectedRarities = txt
+ViewCreator.AddDropdownCard(MiscScroll, "Select Rarity Pets", Config.ESPSelectedRarities, rarityOptions, function(selectedValue)
+    Config.ESPSelectedRarities = selectedValue
 end, "ESPSelectedRarities")
 
-local sizeOptions = {"Colossal", "Huge", "Normal", "All"}
-ViewCreator.AddDropdownCard(MiscScroll, "Select Size Pets", Config.ESPSelectedSizes, sizeOptions, function(txt)
-    Config.ESPSelectedSizes = txt
+ViewCreator.AddDropdownCard(MiscScroll, "Select Size Pets", Config.ESPSelectedSizes, sizeOptions, function(selectedValue)
+    Config.ESPSelectedSizes = selectedValue
 end, "ESPSelectedSizes")
 
 ViewCreator.AddToggleCard(MiscScroll, "ESP Spawned Pets", Config.ESPEnabled, function(bool)
@@ -1328,7 +1723,7 @@ ViewCreator.AddToggleCard(MiscScroll, "ESP Spawned Pets", Config.ESPEnabled, fun
 end, "ESPEnabled")
 
 -- ---------------------------------------------------------------------
--- TAB 3: SETTINGS ENGINE CONFIGURATION (MOVEMENT & DEFENSE)
+-- TAB 3: SETTINGS ENGINE CONFIGURATION (TELEPORT MANAGER RECON)
 -- ---------------------------------------------------------------------
 ViewCreator.AddSectionHeader(SettingsScroll, "Movement Control Parameters")
 
@@ -1338,16 +1733,8 @@ ViewCreator.AddSingleDropdownCard(SettingsScroll, "Teleport Manager", Config.Tel
     print("[ENGINE]: Velocity mechanics shifted to mode -> " .. tostring(selectedMode))
 end, "TeleportMode")
 
-ViewCreator.AddToggleCard(SettingsScroll, "Enable Anti-Steal Guard", Config.ProtectionEnabled, function(bool)
-    Config.ProtectionEnabled = bool
-end, "ProtectionEnabled")
-
-ViewCreator.AddInputCard(SettingsScroll, "Guard Radius (Studs)", Config.ProtectionRadius, function(val)
-    Config.ProtectionRadius = tonumber(val) or 15
-end, "ProtectionRadius")
-
 -- ---------------------------------------------------------------------
--- TAB 4: CONFIG MANAGEMENT SYSTEM
+-- TAB 4: CONFIG MANAGE SYSTEM (JSON DRIVEN)
 -- ---------------------------------------------------------------------
 ViewCreator.AddActionCard(ConfigScroll, "Save Current System Settings", "Save Config", function()
     saveConfig()
@@ -1363,7 +1750,8 @@ Nav:RegisterTab("Misc", "⚙️", MiscView)
 Nav:RegisterTab("Settings", "🛠️", SettingsView)
 Nav:RegisterTab("Configs", "💾", ConfigView)
 
+-- Automated Workspace State Setup: Auto Load JSON Configuration File
 pcall(loadConfig)
 
-print("[SYSTEM]: Layout Engine Version 5.1 fully integrated. Pet Hunt & Server Hop matrices operational.")
+print("[SYSTEM]: Layout Engine Version 6.0 fully configured. Server Hop Matrix online.")
 ]])()
