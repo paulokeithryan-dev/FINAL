@@ -1,6 +1,5 @@
-loadstring([[
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 6.0 (UNIFIED MASTER ENGINE)
+-- PREMIUM UI ENGINE - VERSION 6.1 (UNIFIED MASTER ENGINE)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -51,11 +50,24 @@ local Config = {
     ESPSelectedSizes = "Select Options",
     
     -- SETTINGS CONTROL MATRIX
-    TeleportMode = "Tween"
+    TeleportMode = "Tween",
+    SkipLoadingScreen = false
 }
 
 -- Registry to track UI toggle elements for dynamic visual updates
 local ToggleRegistry = {}
+
+-- High Performance ESP Cache Lookup Tables
+local ESPCache = { Pets = {}, Rarities = {}, Sizes = {} }
+local function updateESPCache(cacheType, commaStr)
+    ESPCache[cacheType] = {}
+    if commaStr and commaStr ~= "None" and commaStr ~= "Select Options" and commaStr ~= "" then
+        for token in string.gmatch(commaStr, "[^,%s]+") do
+            local cleanToken = string.lower(string.gsub(token, "%s+", ""))
+            ESPCache[cacheType][cleanToken] = true
+        end
+    end
+end
 
 -- ---------------------------------------------------------------------
 -- SERVICE HOOKS & BACKGROUND AUTO-TRACKING ENGINE
@@ -319,7 +331,7 @@ local function loadConfig()
                 "FullBright", "InfiniteZoom", "AntiFling", "LessKnockback", 
                 "InstantPrompt", "BypassGameplayPaused", "ESPEnabled",
                 "ESPSelectedPets", "ESPSelectedRarities", "ESPSelectedSizes",
-                "TeleportMode", "ServerHopEnabled", "MaxServerPlayers"
+                "TeleportMode", "ServerHopEnabled", "MaxServerPlayers", "SkipLoadingScreen"
             }
             
             for _, key in ipairs(simpleElements) do
@@ -331,6 +343,11 @@ local function loadConfig()
                     ToggleRegistry["Pet_" .. petName](isTargeted)
                 end
             end
+            
+            -- Compile high speed lookups instantly on load
+            updateESPCache("Pets", Config.ESPSelectedPets)
+            updateESPCache("Rarities", Config.ESPSelectedRarities)
+            updateESPCache("Sizes", Config.ESPSelectedSizes)
             
             print("[CONFIG]: Setup configuration loaded and applied successfully.")
         end
@@ -397,7 +414,9 @@ local function applyAggressiveLagReduction()
         end)
     end
     
-    for _, instance in ipairs(workspace:GetDescendants()) do
+    local descendants = workspace:GetDescendants()
+    for i, instance in ipairs(descendants) do
+        if i % 1000 == 0 then task.wait() end -- Yield gate protection to prevent crash micro-stutters
         pcall(function()
             if instance:IsA("ParticleEmitter") or instance:IsA("Smoke") or instance:IsA("Sparkles") or instance:IsA("Fire") then
                 instance.Enabled = false
@@ -448,16 +467,11 @@ local function renderESPForModel(petModel)
     local petName = petModel:GetAttribute("PetName") or petModel.Name
     local cleanName = string.gsub(petName, "%s+", "")
     
-    -- Filter 1: Individual Species Match
-    if Config.ESPSelectedPets and Config.ESPSelectedPets ~= "" and Config.ESPSelectedPets ~= "None" and Config.ESPSelectedPets ~= "Select Options" then
-        local foundMatch = false
-        for token in string.gmatch(Config.ESPSelectedPets, "[^,%s]+") do
-            if string.lower(cleanName) == string.lower(token) or string.lower(petName) == string.lower(token) then
-                foundMatch = true
-                break
-            end
+    -- Optimized Filter 1: Species Dictionary Match
+    if next(ESPCache.Pets) then
+        if not ESPCache.Pets[string.lower(cleanName)] and not ESPCache.Pets[string.lower(string.gsub(petName, "%s+", ""))] then 
+            return 
         end
-        if not foundMatch then return end
     end
     
     -- Filter 2: Rarity Extraction Lookup
@@ -471,28 +485,19 @@ local function renderESPForModel(petModel)
         end
     end
     
-    if Config.ESPSelectedRarities and Config.ESPSelectedRarities ~= "" and Config.ESPSelectedRarities ~= "None" and Config.ESPSelectedRarities ~= "Select Options" then
-        local foundMatch = false
-        for token in string.gmatch(Config.ESPSelectedRarities, "[^,%s]+") do
-            if string.lower(petRarity) == string.lower(token) then
-                foundMatch = true
-                break
-            end
+    -- Optimized Filter 2 Check
+    if next(ESPCache.Rarities) then
+        if not ESPCache.Rarities[string.lower(petRarity)] then 
+            return 
         end
-        if not foundMatch then return end
     end
     
-    -- Filter 3: Volumetric Size Evaluation
+    -- Optimized Filter 3 Check
     local rawSize = petModel:GetAttribute("PetSize") or petModel:GetAttribute("Size") or "Normal"
-    if Config.ESPSelectedSizes and Config.ESPSelectedSizes ~= "" and Config.ESPSelectedSizes ~= "None" and Config.ESPSelectedSizes ~= "Select Options" then
-        local foundMatch = false
-        for token in string.gmatch(Config.ESPSelectedSizes, "[^,%s]+") do
-            if string.lower(tostring(rawSize)) == string.lower(token) then
-                foundMatch = true
-                break
-            end
+    if next(ESPCache.Sizes) then
+        if not ESPCache.Sizes[string.lower(tostring(rawSize))] then 
+            return 
         end
-        if not foundMatch then return end
     end
     
     -- Dynamic Text Color Coding Sequence
@@ -689,11 +694,60 @@ task.spawn(function()
     end
 end)
 
+-- HIGH SPEED LOADING SCREEN INSTANT BYPASS MATRIX THREAD
+task.spawn(function()
+    while task.wait(0.2) do
+        if Config.SkipLoadingScreen then
+            pcall(function()
+                -- Camera Trap Interceptor Engine
+                local camera = workspace.CurrentCamera
+                if camera and camera.CameraType == Enum.CameraType.Scriptable then
+                    local isTrapped = false
+                    local searchRoot = workspace:FindFirstChild("Gardens")
+                    if searchRoot then
+                        for _, item in ipairs(searchRoot:GetDescendants()) do
+                            if (item.Name == "LoadingScreenCam" or item.Name == "LoadingCam") and item:IsA("BasePart") then
+                                if (camera.CFrame.Position - item.Position).Magnitude < 10 then
+                                    isTrapped = true
+                                    break
+                                end
+                            end
+                        end
+                    end
+                    if isTrapped then
+                        camera.CameraType = Enum.CameraType.Custom
+                        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                        if hum then camera.CameraSubject = hum end
+                    end
+                end
+
+                -- Interface Deletion Matrix
+                local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+                if playerGui then
+                    for _, element in ipairs(playerGui:GetChildren()) do
+                        if element:IsA("ScreenGui") and element.Enabled then
+                            local nameLower = string.lower(element.Name)
+                            if string.find(nameLower, "loading") or string.find(nameLower, "intro") or string.find(nameLower, "transition") then
+                                element.Enabled = false
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
 -- UNIFIED HUNTING & SERVER HOPPING WORKER THREAD
 task.spawn(function()
     local lastPromptCheck = 0
     local lastGardenClean = 0
     local isProcessingHopLifecycle = false
+    
+    -- Smooth Walk State Persistence
+    local lastPathCompute = 0
+    local walkWaypoints = {}
+    local currentWPIndex = 1
     
     while task.wait(0.1) do
         if Config.AutoRemoveOtherGardens and (os.clock() - lastGardenClean > 1.5) then
@@ -776,30 +830,35 @@ task.spawn(function()
                             elseif Config.TeleportMode == "Walk" then
                                 local dist = (rootPart.Position - petRoot.Position).Magnitude
                                 if dist > 6 then
-                                    local path = PathfindingService:CreatePath({
-                                        AgentRadius = 2,
-                                        AgentHeight = 5,
-                                        AgentCanJump = true,
-                                        WaypointSpacing = 4
-                                    })
-                                    local success = pcall(function()
-                                        path:ComputeAsync(rootPart.Position, petRoot.Position)
-                                    end)
+                                    -- Non-blocking iterative pathfinder evaluation frame logic
+                                    if os.clock() - lastPathCompute > 1.2 or #walkWaypoints == 0 or currentWPIndex > #walkWaypoints then
+                                        lastPathCompute = os.clock()
+                                        local path = PathfindingService:CreatePath({
+                                            AgentRadius = 2,
+                                            AgentHeight = 5,
+                                            AgentCanJump = true,
+                                            WaypointSpacing = 4
+                                        })
+                                        local success = pcall(function()
+                                            path:ComputeAsync(rootPart.Position, petRoot.Position)
+                                        end)
+                                        
+                                        if success and path.Status == Enum.PathStatus.Success then
+                                            walkWaypoints = path:GetWaypoints()
+                                            currentWPIndex = 1
+                                        else
+                                            walkWaypoints = {}
+                                        end
+                                    end
                                     
-                                    if success and path.Status == Enum.PathStatus.Success then
-                                        local waypoints = path:GetWaypoints()
-                                        local numWaypointsToFollow = math.min(#waypoints, 3)
-                                        for i = 1, numWaypointsToFollow do
-                                            local wp = waypoints[i]
-                                            if wp.Action == Enum.PathWaypointAction.Jump then
-                                                humanoid.Jump = true
-                                            end
-                                            humanoid:MoveTo(wp.Position)
-                                            
-                                            local t = 0
-                                            while (rootPart.Position - wp.Position).Magnitude > 3 and t < 0.4 do
-                                                t = t + task.wait(0.02)
-                                            end
+                                    if #walkWaypoints > 0 and currentWPIndex <= #walkWaypoints then
+                                        local wp = walkWaypoints[currentWPIndex]
+                                        if wp.Action == Enum.PathWaypointAction.Jump then
+                                            humanoid.Jump = true
+                                        end
+                                        humanoid:MoveTo(wp.Position)
+                                        if (rootPart.Position - wp.Position).Magnitude <= 4 then
+                                            currentWPIndex = currentWPIndex + 1
                                         end
                                     else
                                         humanoid:MoveTo(petRoot.Position)
@@ -1707,14 +1766,17 @@ local sizeOptions = {"None", "Big", "Huge"}
 
 ViewCreator.AddDropdownCard(MiscScroll, "Select Pets", Config.ESPSelectedPets, petOptions, function(selectedValue)
     Config.ESPSelectedPets = selectedValue
+    updateESPCache("Pets", selectedValue)
 end, "ESPSelectedPets")
 
 ViewCreator.AddDropdownCard(MiscScroll, "Select Rarity Pets", Config.ESPSelectedRarities, rarityOptions, function(selectedValue)
     Config.ESPSelectedRarities = selectedValue
+    updateESPCache("Rarities", selectedValue)
 end, "ESPSelectedRarities")
 
 ViewCreator.AddDropdownCard(MiscScroll, "Select Size Pets", Config.ESPSelectedSizes, sizeOptions, function(selectedValue)
     Config.ESPSelectedSizes = selectedValue
+    updateESPCache("Sizes", selectedValue)
 end, "ESPSelectedSizes")
 
 ViewCreator.AddToggleCard(MiscScroll, "ESP Spawned Pets", Config.ESPEnabled, function(bool)
@@ -1732,6 +1794,12 @@ ViewCreator.AddSingleDropdownCard(SettingsScroll, "Teleport Manager", Config.Tel
     Config.TeleportMode = selectedMode
     print("[ENGINE]: Velocity mechanics shifted to mode -> " .. tostring(selectedMode))
 end, "TeleportMode")
+
+ViewCreator.AddSectionHeader(SettingsScroll, "Interface & Gameplay Bypasses")
+
+ViewCreator.AddToggleCard(SettingsScroll, "⚡ INSTANT SKIP LOADING SCREEN", Config.SkipLoadingScreen, function(bool)
+    Config.SkipLoadingScreen = bool
+end, "SkipLoadingScreen")
 
 -- ---------------------------------------------------------------------
 -- TAB 4: CONFIG MANAGE SYSTEM (JSON DRIVEN)
@@ -1753,5 +1821,4 @@ Nav:RegisterTab("Configs", "💾", ConfigView)
 -- Automated Workspace State Setup: Auto Load JSON Configuration File
 pcall(loadConfig)
 
-print("[SYSTEM]: Layout Engine Version 6.0 fully configured. Server Hop Matrix online.")
-]])()
+print("[SYSTEM]: Layout Engine Version 6.1 fully configured. Server Hop Matrix online.")
