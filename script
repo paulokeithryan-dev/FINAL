@@ -1,6 +1,6 @@
 loadstring([[
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 4.8 (MULTI-SELECT DRIVEN MATRIX)
+-- PREMIUM UI ENGINE - VERSION 4.9 (DYNAMIC COLOR MATRIX & CLEAN ESP)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -80,6 +80,17 @@ local Database = {
     {"Bear", "Mythic ($5M)"},
     {"Black Dragon", "BlackDragon", "Super ($20M)"},
     {"Ice Serpent", "IceSerpent", "Super ($20M)"}
+}
+
+-- Hex Color Matrix map for RichText formatting base on rarity
+local RarityHexColors = {
+    ["Common"] = "#FFFFFF",       -- White
+    ["Uncommon"] = "#00FF00",     -- Green
+    ["Rare"] = "#00BFFF",         -- Blue (Deep Sky Blue)
+    ["Legendary"] = "#FFFF00",    -- Yellow
+    ["Mythic"] = "#FF0000",       -- Red
+    ["Super"] = "#FF00FF",        -- Magenta / Super
+    ["Unknown"] = "#FFFFFF"
 }
 
 local function smoothFlyTo(targetCFrame, speedOverride)
@@ -396,11 +407,13 @@ local function renderESPForModel(petModel)
         if not foundMatch then return end
     end
     
-    -- Verification passes: Generate visual instances
+    -- Dynamic Text Color Coding Sequence
+    local chosenHex = RarityHexColors[petRarity] or "#FFFFFF"
+    
     local trackedElements = {}
     
     local billboard = Instance.new("BillboardGui")
-    billboard.Size = UDim2.new(0, 130, 0, 28)
+    billboard.Size = UDim2.new(0, 160, 0, 30)
     billboard.AlwaysOnTop = true
     billboard.Adornee = petModel.RootPart
     billboard.Parent = petModel.RootPart
@@ -408,22 +421,19 @@ local function renderESPForModel(petModel)
     local textLabel = Instance.new("TextLabel")
     textLabel.Size = UDim2.new(1, 0, 1, 0)
     textLabel.BackgroundTransparency = 1
-    textLabel.Text = petName .. " [" .. petRarity .. "]"
-    textLabel.TextColor3 = Color3.fromRGB(240, 70, 70)
+    textLabel.RichText = true
+    
+    -- Combines White Pet name with customizable Rarity-colored text block
+    textLabel.Text = string.format("<font color=\"#FFFFFF\">%s</font> <font color=\"%s\">[%s]</font>", petName, chosenHex, petRarity)
+    
     textLabel.Font = Enum.Font.GothamBold
-    textLabel.TextSize = 11
+    textLabel.TextSize = 12
+    textLabel.TextStrokeTransparency = 0.4
+    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     textLabel.Parent = billboard
     table.insert(trackedElements, billboard)
     
-    local adornment = Instance.new("BoxHandleAdornment")
-    adornment.Size = petModel:GetExtentsSize() + Vector3.new(0.3, 0.3, 0.3)
-    adornment.AlwaysOnTop = true
-    adornment.ZIndex = 6
-    adornment.Color3 = Color3.fromRGB(240, 70, 70)
-    adornment.Transparency = 0.65
-    adornment.Adornee = petModel.RootPart
-    adornment.Parent = petModel.RootPart
-    table.insert(trackedElements, adornment)
+    -- NOTE: BoxHandleAdornment highlight box generation block completely extracted to ensure performance transparency.
     
     ActiveESP[petModel] = trackedElements
 end
@@ -1053,7 +1063,6 @@ function ViewCreator.AddActionCard(scrollTarget, labelText, buttonText, onClickE
     ActionBtn.MouseButton1Click:Connect(onClickEvent)
 end
 
--- UPGRADED: PRE-COMPILED MULTI-SELECT DROPDOWN SYSTEM WITH RE-ALIGNMENT HOOKS
 function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optionsList, onSelect, registryKey)
     local Card = Instance.new("Frame")
     Card.Size = UDim2.new(1, -8, 0, 42)
@@ -1142,7 +1151,6 @@ function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optio
         end
     end)
     
-    -- MULTI-SELECT MATRIX INITIALIZATION
     local activeSelections = {}
     
     local function parseInitialState(txt)
@@ -1374,5 +1382,5 @@ Nav:RegisterTab("Configs", "💾", ConfigView)
 -- Automated Workspace State Setup: Auto Load JSON Configuration File
 pcall(loadConfig)
 
-print("[SYSTEM]: Layout Engine Version 4.8 fully loaded. Multi-select filtering matrix compiled.")
+print("[SYSTEM]: Layout Engine Version 4.9 fully loaded. Clean multi-color text ESP active.")
 ]])()
