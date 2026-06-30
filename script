@@ -59,6 +59,7 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
+local PathfindingService = game:GetService("PathfindingService")
 local LocalPlayer = Players.LocalPlayer
 
 local FILE_NAME = "PetHunter_PremiumConfig.json"
@@ -649,8 +650,6 @@ task.spawn(function()
                         task.wait(0.1) 
                     end
                     
-                    smoothFlyTo(petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0), Config.TweenSpeed)
-                    
                     while Config.PetHuntEnabled and activeTarget and activeTarget:IsDescendantOf(wildFolder) and petRoot do
                         
                         local closestThief = nil
@@ -670,7 +669,60 @@ task.spawn(function()
                         if closestThief then
                             executeInterceptionManeuver(closestThief, petRoot)
                         else
-                            rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
+                            -- -----------------------------------------------------------------
+                            -- ADVANCED MOVEMENT SYSTEM (TELEPORT, TWEEN, OR NATURAL PATHFINDING)
+                            -- -----------------------------------------------------------------
+                            if Config.TeleportMode == "Teleport" then
+                                rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
+                                
+                            elseif Config.TeleportMode == "Tween" then
+                                local dist = (rootPart.Position - (petRoot.Position + Vector3.new(0, Config.FlyHeight, 0))).Magnitude
+                                if dist > 5 then
+                                    smoothFlyTo(petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0), Config.TweenSpeed)
+                                else
+                                    rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
+                                end
+                                
+                            elseif Config.TeleportMode == "Walk" then
+                                local dist = (rootPart.Position - petRoot.Position).Magnitude
+                                if dist > 6 then
+                                    local path = PathfindingService:CreatePath({
+                                        AgentRadius = 2,
+                                        AgentHeight = 5,
+                                        AgentCanJump = true,
+                                        WaypointSpacing = 4
+                                    })
+                                    local success = pcall(function()
+                                        path:ComputeAsync(rootPart.Position, petRoot.Position)
+                                    end)
+                                    
+                                    if success and path.Status == Enum.PathStatus.Success then
+                                        local waypoints = path:GetWaypoints()
+                                        -- Process a localized segment block of waypoints to ensure snappy recalculation
+                                        local numWaypointsToFollow = math.min(#waypoints, 3)
+                                        for i = 1, numWaypointsToFollow do
+                                            local wp = waypoints[i]
+                                            if wp.Action == Enum.PathWaypointAction.Jump then
+                                                humanoid.Jump = true
+                                            end
+                                            humanoid:MoveTo(wp.Position)
+                                            
+                                            -- Safe micro-yield loop for active tracking
+                                            local t = 0
+                                            while (rootPart.Position - wp.Position).Magnitude > 3 and t < 0.4 do
+                                                t = t + task.wait(0.02)
+                                            end
+                                        end
+                                    else
+                                        -- Dynamic Fallback straight toward the coordinate position if space logic fails
+                                        humanoid:MoveTo(petRoot.Position)
+                                    end
+                                else
+                                    -- Precise sticky-follow adjustments when near pet position
+                                    humanoid:MoveTo(petRoot.Position)
+                                end
+                            end
+                            
                             if shovel and shovel.Parent == LocalPlayer.Backpack then
                                 humanoid:EquipTool(shovel)
                             end
@@ -1510,7 +1562,7 @@ end, "ESPEnabled")
 -- ---------------------------------------------------------------------
 ViewCreator.AddSectionHeader(SettingsScroll, "Movement Control Parameters")
 
-local teleportModes = {"Tween", "Teleporter (Tool)", "Teleport"}
+local teleportModes = {"Tween", "Walk", "Teleport"}
 ViewCreator.AddSingleDropdownCard(SettingsScroll, "Teleport Manager", Config.TeleportMode, teleportModes, function(selectedMode)
     Config.TeleportMode = selectedMode
     print("[ENGINE]: Velocity mechanics shifted to mode -> " .. tostring(selectedMode))
