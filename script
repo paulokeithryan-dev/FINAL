@@ -1822,3 +1822,94 @@ Nav:RegisterTab("Configs", "💾", ConfigView)
 pcall(loadConfig)
 
 print("[SYSTEM]: Layout Engine Version 6.1 fully configured. Server Hop Matrix online.")
+
+
+-- =============================================================================
+-- [ Grow a Garden 2 — Teleport Button Extension ]
+-- Append this snippet to your Masterscript UI initialization phase.
+-- =============================================================================
+task.spawn(function()
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10)
+    
+    if not PlayerGui then 
+        warn("[Masterscript]: PlayerGui loading timed out.") 
+        return 
+    end
+
+    -- Target UI Layout Container from Dex
+    local buttonContainer = PlayerGui:WaitForChild("TeleportButtons", 5):WaitForChild("TeleportButtons", 5)
+    local templateButton = buttonContainer:WaitForChild("SeedsButton", 5)
+
+    -- Workspace Teleport Parts
+    local teleports = workspace:WaitForChild("Teleports", 5)
+    local gearsPart = teleports:WaitForChild("Gears", 5)
+    local propsPart = teleports:WaitForChild("Props", 5)
+
+    if not (buttonContainer and templateButton and gearsPart and propsPart) then
+        warn("[Masterscript]: Failed to locate native teleport assets or UI layout elements.")
+        return
+    end
+
+    -- Stand Color Themes (Mapped directly from your captures)
+    local GEARS_COLOR = Color3.fromRGB(24, 154, 242)   -- Royal Blue (image_128306.png)
+    local PROPS_COLOR = Color3.fromRGB(243, 142, 196) -- Pastel Pink (image_12801c.png)
+
+    -- Safe Physics Teleport Matrix Handler
+    local function teleportTo(targetPart)
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            -- Safely offsets vertical position to prevent map clipping on 1x1x1 components
+            character.HumanoidRootPart.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0)
+        end
+    end
+
+    -- Button Constructor Engine
+    local function injectCustomButton(name, labelText, themeColor, targetPart)
+        -- Cleanup previous instances if re-injecting the masterscript
+        if buttonContainer:FindFirstChild(name) then
+            buttonContainer[name]:Destroy()
+        end
+
+        local newButton = templateButton:Clone()
+        newButton.Name = name
+        
+        -- Text scaling & property normalization
+        if newButton:IsA("TextButton") then
+            newButton.Text = labelText
+        end
+        
+        local innerText = newButton:FindFirstChildOfClass("TextLabel")
+        if innerText then
+            innerText.Text = labelText
+        end
+
+        -- Theme Mapping
+        newButton.BackgroundColor3 = themeColor
+        if newButton:IsA("ImageButton") then
+            newButton.ImageColor3 = themeColor
+        end
+
+        -- Deep-recolor styling descendants (Strokes, borders, backgrounds)
+        for _, child in ipairs(newButton:GetDescendants()) do
+            if child:IsA("Frame") or child:IsA("ImageLabel") then
+                child.BackgroundColor3 = themeColor
+                if child:IsA("ImageLabel") then 
+                    child.ImageColor3 = themeColor 
+                end
+            end
+        end
+
+        -- Connection Hook
+        newButton.MouseButton1Click:Connect(function()
+            teleportTo(targetPart)
+        end)
+
+        newButton.Parent = buttonContainer
+    end
+
+    -- Render Elements natively into the UIListLayout
+    injectCustomButton("GearsButton", "Gears 🛠️", GEARS_COLOR, gearsPart)
+    injectCustomButton("PropsButton", "Props 📦", PROPS_COLOR, propsPart)
+end)
