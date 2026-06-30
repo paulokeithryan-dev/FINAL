@@ -1825,8 +1825,8 @@ print("[SYSTEM]: Layout Engine Version 6.1 fully configured. Server Hop Matrix o
 
 
 -- =============================================================================
--- [ Grow a Garden 2 — Bugfixed Native Teleport UI Extension ]
--- Drop-in addition for the bottom of your masterscript.
+-- [ Grow a Garden 2 — Ultimate Native Stud UI Extension ]
+-- Replace the previous snippet at the bottom of your master code with this.
 -- =============================================================================
 task.spawn(function()
     local Players = game:GetService("Players")
@@ -1846,15 +1846,58 @@ task.spawn(function()
 
     if not (buttonContainer and templateButton and gearsPart and propsPart) then return end
 
-    -- True-color theme tokens (Vibrant Blue & Pink)
-    local GEARS_COLOR = Color3.fromRGB(0, 162, 255)
-    local PROPS_COLOR = Color3.fromRGB(255, 138, 210)
+    -- Perfect theme color mapping for the stud design tinting
+    local GEARS_COLOR = Color3.fromRGB(0, 162, 255)  -- Crisp Royal Blue
+    local PROPS_COLOR = Color3.fromRGB(255, 138, 210) -- Clean Stand Pink
 
     -- Safe physics handling to prevent clipping
     local function teleportTo(targetPart)
         local character = LocalPlayer.Character
         if character and character:FindFirstChild("HumanoidRootPart") then
             character.HumanoidRootPart.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0)
+        end
+    end
+
+    -- Force-lock engine to bypass native game script overrides
+    local function lockButtonElements(button, labelText, themeColor)
+        -- Helper to apply text changes and lock them down permanently
+        local function secureText(instance)
+            instance.Text = labelText
+            instance:GetPropertyChangedSignal("Text"):Connect(function()
+                instance.Text = labelText
+            end)
+        end
+
+        -- Helper to apply image colors and lock them down permanently
+        local function secureImageColor(instance)
+            instance.ImageColor3 = themeColor
+            instance:GetPropertyChangedSignal("ImageColor3"):Connect(function()
+                instance.ImageColor3 = themeColor
+            end)
+        end
+
+        -- Process root button object
+        if button:IsA("TextButton") or button:IsA("TextLabel") then secureText(button) end
+        if button:IsA("ImageButton") or button:IsA("ImageLabel") then secureImageColor(button) end
+
+        -- Process all structural and shadow descendants recursively
+        for _, child in ipairs(button:GetDescendants()) do
+            if child:IsA("TextLabel") or child:IsA("TextButton") then
+                -- Fixes the ghosting shadow layer by capturing every text container
+                secureText(child)
+            end
+            
+            if child:IsA("ImageLabel") or child:IsA("ImageButton") then
+                -- Keeps the native stud design intact while forcing the blue/pink colors
+                secureImageColor(child)
+            end
+            
+            if child:IsA("Frame") then
+                child.BackgroundColor3 = themeColor
+                child:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
+                    child.BackgroundColor3 = themeColor
+                end)
+            end
         end
     end
 
@@ -1866,34 +1909,9 @@ task.spawn(function()
 
         local newButton = templateButton:Clone()
         newButton.Name = name
-        
-        -- Scrub all nested text layouts (Fixes "Seeds" ghosting overlap bug)
-        if newButton:IsA("TextButton") or newButton:IsA("TextLabel") then
-            newButton.Text = labelText
-        end
-        for _, child in ipairs(newButton:GetDescendants()) do
-            if child:IsA("TextLabel") or child:IsA("TextButton") then
-                child.Text = labelText
-            end
-        end
 
-        -- Erase native green image sheets (Fixes muddy/brown color blend bug)
-        newButton.BackgroundColor3 = themeColor
-        if newButton:IsA("ImageButton") then
-            newButton.Image = ""
-            newButton.ImageColor3 = themeColor
-        end
-
-        -- Deep clean any structural sub-images or frame overlays
-        for _, child in ipairs(newButton:GetDescendants()) do
-            if child:IsA("Frame") then
-                child.BackgroundColor3 = themeColor
-            elseif child:IsA("ImageLabel") then
-                child.Image = ""
-                child.BackgroundColor3 = themeColor
-                child.ImageColor3 = themeColor
-            end
-        end
+        -- Apply structural asset property configurations and lock them
+        lockButtonElements(newButton, labelText, themeColor)
 
         -- Teleport interaction link
         newButton.MouseButton1Click:Connect(function()
@@ -1903,7 +1921,7 @@ task.spawn(function()
         newButton.Parent = buttonContainer
     end
 
-    -- Instantly push clean buttons into the UIListLayout alignment
+    -- Instantly push beautifully tinted stud buttons into the native Topbar layout
     injectCustomButton("GearsButton", "Gears 🛠️", GEARS_COLOR, gearsPart)
     injectCustomButton("PropsButton", "Props 📦", PROPS_COLOR, propsPart)
 end)
