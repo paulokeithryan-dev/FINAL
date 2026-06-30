@@ -1,5 +1,5 @@
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 6.1 (UNIFIED MASTER ENGINE)
+-- PREMIUM UI ENGINE - VERSION 6.2 (STABLE MOVEMENT MASTER ENGINE)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -517,7 +517,7 @@ local function renderESPForModel(petModel)
     textLabel.RichText = true
     
     -- Combines White Pet name with customizable Rarity-colored text block
-    textLabel.Text = string.format("<font color=\"#FFFFFF\">%s</font> <font color=\"%s\">[%s]</font>", petName, chosenHex, petRarity)
+    textLabel.Text = string.format("<font color=\"%s\">%s</font> <font color=\"%s\">[%s]</font>", "#FFFFFF", petName, chosenHex, petRarity)
     
     textLabel.Font = Enum.Font.GothamBold
     textLabel.TextSize = 12
@@ -928,7 +928,7 @@ function BaseLayout.new()
     self.MainWindow.BackgroundColor3 = Color3.fromRGB(24, 24, 26)
     self.MainWindow.BorderSizePixel = 0
     self.MainWindow.Active = true
-    self.MainWindow.Draggable = true
+    self.MainWindow.Draggable = false -- FIXED: Terminated buggy native dragging that causes scrolling drift
     self.MainWindow.Parent = self.ScreenGui
     
     local MainCorner = Instance.new("UICorner")
@@ -957,6 +957,57 @@ function BaseLayout.new()
     self.ViewContainer.Position = UDim2.new(0, 160, 0, 10)
     self.ViewContainer.BackgroundTransparency = 1
     self.ViewContainer.Parent = self.MainWindow
+
+    -- FIX: Native Dragging Interceptor System (Locks window firmly unless background area is dragged)
+    local UserInputService = game:GetService("UserInputService")
+    local dragging = false
+    local dragInput, dragStart, startPos
+
+    local function updateDrag(input)
+        local delta = input.Position - dragStart
+        self.MainWindow.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+
+    local function connectDragSurface(surface)
+        surface.InputBegan:Connect(function(input)
+            if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                if UserInputService:GetFocusedTextBox() then return end
+                
+                -- Verify the click did not start inside scrolling options or action cards
+                local clickElements = targetParent:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
+                for _, obj in ipairs(clickElements) do
+                    if obj:IsDescendantOf(self.ViewContainer) or obj:IsA("ScrollingFrame") or obj:IsA("TextButton") then
+                        return -- Absorb input, reject drag initialization
+                    end
+                end
+
+                dragging = true
+                dragStart = input.Position
+                startPos = self.MainWindow.Position
+
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
+            end
+        end)
+
+        surface.InputChanged:Connect(function(input)
+            if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                dragInput = input
+            end
+        end)
+    end
+
+    connectDragSurface(self.MainWindow)
+    connectDragSurface(self.Sidebar)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            updateDrag(input)
+        end
+    end)
 
     local MinimizeBtn = Instance.new("TextButton")
     MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
@@ -1139,6 +1190,7 @@ function ViewCreator.SetupCanvas(titleName, viewContainer)
     Scroll.BorderSizePixel = 0
     Scroll.ScrollBarThickness = 4
     Scroll.ScrollBarImageColor3 = Color3.fromRGB(65, 65, 70)
+    Scroll.Active = true -- FIX: Forces input capture matrix layer on background scrolling
     Scroll.Parent = ViewFrame
     
     local ListLayout = Instance.new("UIListLayout")
@@ -1175,6 +1227,7 @@ function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickE
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
     Card.BorderSizePixel = 0
+    Card.Active = true -- FIX: Absorbs scrolling focus boundaries
     Card.Parent = scrollTarget
     
     local CardCorner = Instance.new("UICorner")
@@ -1243,6 +1296,7 @@ function ViewCreator.AddActionCard(scrollTarget, labelText, buttonText, onClickE
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
     Card.BorderSizePixel = 0
+    Card.Active = true -- FIX: Absorbs scrolling focus boundaries
     Card.Parent = scrollTarget
     
     local CardCorner = Instance.new("UICorner")
@@ -1282,6 +1336,7 @@ function ViewCreator.AddInputCard(scrollTarget, labelText, defaultText, onTextCh
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
     Card.BorderSizePixel = 0
+    Card.Active = true -- FIX: Absorbs scrolling focus boundaries
     Card.Parent = scrollTarget
     
     local CardCorner = Instance.new("UICorner")
@@ -1329,6 +1384,7 @@ function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optio
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
     Card.BorderSizePixel = 0
+    Card.Active = true -- FIX: Absorbs scrolling focus boundaries
     Card.Parent = scrollTarget
     
     local CardCorner = Instance.new("UICorner")
@@ -1509,6 +1565,7 @@ function ViewCreator.AddSingleDropdownCard(scrollTarget, labelText, defaultText,
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
     Card.BorderSizePixel = 0
+    Card.Active = true -- FIX: Absorbs scrolling focus boundaries
     Card.Parent = scrollTarget
     
     local CardCorner = Instance.new("UICorner")
@@ -1821,7 +1878,7 @@ Nav:RegisterTab("Configs", "💾", ConfigView)
 -- Automated Workspace State Setup: Auto Load JSON Configuration File
 pcall(loadConfig)
 
-print("[SYSTEM]: Layout Engine Version 6.1 fully configured. Server Hop Matrix online.")
+print("[SYSTEM]: Layout Engine Version 6.2 fully configured. Server Hop Matrix online.")
 
 
 -- =============================================================================
