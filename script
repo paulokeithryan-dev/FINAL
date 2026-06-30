@@ -1825,8 +1825,8 @@ print("[SYSTEM]: Layout Engine Version 6.1 fully configured. Server Hop Matrix o
 
 
 -- =============================================================================
--- [ Grow a Garden 2 — Ultimate Native Stud UI Extension ]
--- Replace the previous snippet at the bottom of your master code with this.
+-- [ Grow a Garden 2 — Ultimate Stud UI Extension (Font & Icon Fixed) ]
+-- Paste this clean version directly at the very bottom of your master code.
 -- =============================================================================
 task.spawn(function()
     local Players = game:GetService("Players")
@@ -1835,7 +1835,7 @@ task.spawn(function()
     
     if not PlayerGui then return end
 
-    -- Core layout references from Dex
+    -- Core layout containers from Dex
     local buttonContainer = PlayerGui:WaitForChild("TeleportButtons", 5):WaitForChild("TeleportButtons", 5)
     local templateButton = buttonContainer:WaitForChild("SeedsButton", 5)
 
@@ -1846,11 +1846,11 @@ task.spawn(function()
 
     if not (buttonContainer and templateButton and gearsPart and propsPart) then return end
 
-    -- Perfect theme color mapping for the stud design tinting
+    -- Solid theme tokens to tint the native stud pattern cleanly
     local GEARS_COLOR = Color3.fromRGB(0, 162, 255)  -- Crisp Royal Blue
     local PROPS_COLOR = Color3.fromRGB(255, 138, 210) -- Clean Stand Pink
 
-    -- Safe physics handling to prevent clipping
+    -- Safe physics vector calculation
     local function teleportTo(targetPart)
         local character = LocalPlayer.Character
         if character and character:FindFirstChild("HumanoidRootPart") then
@@ -1858,50 +1858,55 @@ task.spawn(function()
         end
     end
 
-    -- Force-lock engine to bypass native game script overrides
-    local function lockButtonElements(button, labelText, themeColor)
-        -- Helper to apply text changes and lock them down permanently
-        local function secureText(instance)
-            instance.Text = labelText
-            instance:GetPropertyChangedSignal("Text"):Connect(function()
-                instance.Text = labelText
-            end)
-        end
-
-        -- Helper to apply image colors and lock them down permanently
-        local function secureImageColor(instance)
-            instance.ImageColor3 = themeColor
-            instance:GetPropertyChangedSignal("ImageColor3"):Connect(function()
-                instance.ImageColor3 = themeColor
-            end)
-        end
-
-        -- Process root button object
-        if button:IsA("TextButton") or button:IsA("TextLabel") then secureText(button) end
-        if button:IsA("ImageButton") or button:IsA("ImageLabel") then secureImageColor(button) end
-
-        -- Process all structural and shadow descendants recursively
+    -- Strict layout sanitization and color-locking engine
+    local function cleanAndLockUI(button, labelText, themeColor)
+        
+        -- Loop through descendants to fix specific layout elements
         for _, child in ipairs(button:GetDescendants()) do
+            
+            -- FIX 1: Clean up typography shadows by forcing strict alignment matching
             if child:IsA("TextLabel") or child:IsA("TextButton") then
-                -- Fixes the ghosting shadow layer by capturing every text container
-                secureText(child)
+                child.Text = labelText
+                child:GetPropertyChangedSignal("Text"):Connect(function()
+                    child.Text = labelText
+                end)
             end
             
+            -- FIX 2: Locate and eliminate the ghost leaf icon asset completely
+            if child:IsA("ImageLabel") and child.Name ~= "Background" then
+                -- Safely hides the leaf icon graphic so it doesn't cross-contaminate text space
+                if child.Size.X.Scale < 0.9 or string.find(string.lower(child.Name), "icon") or string.find(string.lower(child.Name), "leaf") then
+                    child.Visible = false
+                end
+            end
+
+            -- FIX 3: Capture stud textures and lock themes against game script overrides
             if child:IsA("ImageLabel") or child:IsA("ImageButton") then
-                -- Keeps the native stud design intact while forcing the blue/pink colors
-                secureImageColor(child)
-            end
-            
-            if child:IsA("Frame") then
+                if child.Visible then
+                    child.ImageColor3 = themeColor
+                    child:GetPropertyChangedSignal("ImageColor3"):Connect(function()
+                        child.ImageColor3 = themeColor
+                    end)
+                end
+            elseif child:IsA("Frame") then
                 child.BackgroundColor3 = themeColor
                 child:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
                     child.BackgroundColor3 = themeColor
                 end)
             end
         end
+
+        -- Lock main button wrapper color properties
+        button.BackgroundColor3 = themeColor
+        if button:IsA("ImageButton") then
+            button.ImageColor3 = themeColor
+            button:GetPropertyChangedSignal("ImageColor3"):Connect(function()
+                button.ImageColor3 = themeColor
+            end)
+        end
     end
 
-    -- Assembly engine
+    -- Core constructor
     local function injectCustomButton(name, labelText, themeColor, targetPart)
         if buttonContainer:FindFirstChild(name) then
             buttonContainer[name]:Destroy()
@@ -1910,10 +1915,10 @@ task.spawn(function()
         local newButton = templateButton:Clone()
         newButton.Name = name
 
-        -- Apply structural asset property configurations and lock them
-        lockButtonElements(newButton, labelText, themeColor)
+        -- Sanitize text layers, delete icons, and lock colors
+        cleanAndLockUI(newButton, labelText, themeColor)
 
-        -- Teleport interaction link
+        -- Action activation link
         newButton.MouseButton1Click:Connect(function()
             teleportTo(targetPart)
         end)
@@ -1921,7 +1926,7 @@ task.spawn(function()
         newButton.Parent = buttonContainer
     end
 
-    -- Instantly push beautifully tinted stud buttons into the native Topbar layout
-    injectCustomButton("GearsButton", "Gears 🛠️", GEARS_COLOR, gearsPart)
-    injectCustomButton("PropsButton", "Props 📦", PROPS_COLOR, propsPart)
+    -- Execute injection with clean typography strings
+    injectCustomButton("GearsButton", "Gears", GEARS_COLOR, gearsPart)
+    injectCustomButton("PropsButton", "Props", PROPS_COLOR, propsPart)
 end)
