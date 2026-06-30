@@ -652,13 +652,19 @@ task.spawn(function()
             pcall(function()
                 for _, player in ipairs(Players:GetPlayers()) do
                     if player ~= LocalPlayer and player.Character then
-                        for _, part in ipairs(player.Character:GetChildren()) do
+                        for _, part in ipairs(player.Character:GetDescendants()) do
                             if part:IsA("BasePart") then
                                 part.CanCollide = false
-                                part.Velocity = Vector3.zero
-                                part.RotVelocity = Vector3.zero
+                                part.AssemblyLinearVelocity = Vector3.zero
+                                part.AssemblyAngularVelocity = Vector3.zero
                             end
                         end
+                    end
+                end
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    local root = LocalPlayer.Character.HumanoidRootPart
+                    if root.AssemblyLinearVelocity.Magnitude > 250 then
+                        root.AssemblyLinearVelocity = Vector3.zero
                     end
                 end
             end)
@@ -671,13 +677,13 @@ task.spawn(function()
         if Config.LessKnockback and LocalPlayer.Character then
             pcall(function()
                 for _, child in ipairs(LocalPlayer.Character:GetDescendants()) do
-                    if child:IsA("BodyVelocity") or child:IsA("LinearVelocity") or child:IsA("BodyForce") then
+                    if child:IsA("BodyVelocity") or child:IsA("LinearVelocity") or child:IsA("BodyForce") or child:IsA("BodyThrust") then
                         child:Destroy()
                     end
                 end
                 local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if root and root.Velocity.Magnitude > 65 then
-                    root.Velocity = root.Velocity.Unit * 15
+                if root and root.AssemblyLinearVelocity.Magnitude > 50 then
+                    root.AssemblyLinearVelocity = root.AssemblyLinearVelocity.Unit * 12
                 end
             end)
         end
@@ -757,32 +763,23 @@ task.spawn(function()
             pcall(function()
                 local camera = workspace.CurrentCamera
                 if camera and camera.CameraType == Enum.CameraType.Scriptable then
-                    local isTrapped = false
-                    local searchRoot = workspace:FindFirstChild("Gardens")
-                    if searchRoot then
-                        for _, item in ipairs(searchRoot:GetDescendants()) do
-                            if (item.Name == "LoadingScreenCam" or item.Name == "LoadingCam") and item:IsA("BasePart") then
-                                if (camera.CFrame.Position - item.Position).Magnitude < 10 then
-                                    isTrapped = true
-                                    break
-                                end
-                            end
-                        end
-                    end
-                    if isTrapped then
-                        camera.CameraType = Enum.CameraType.Custom
-                        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                        if hum then camera.CameraSubject = hum end
-                    end
+                    camera.CameraType = Enum.CameraType.Custom
+                    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                    if hum then camera.CameraSubject = hum end
                 end
 
                 local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
                 if playerGui then
-                    for _, element in ipairs(playerGui:GetChildren()) do
+                    for _, element in ipairs(playerGui:GetDescendants()) do
                         if element:IsA("ScreenGui") and element.Enabled then
                             local nameLower = string.lower(element.Name)
-                            if string.find(nameLower, "loading") or string.find(nameLower, "intro") or string.find(nameLower, "transition") then
+                            if string.find(nameLower, "loading") or string.find(nameLower, "intro") or string.find(nameLower, "transition") or string.find(nameLower, "teleport") then
                                 element.Enabled = false
+                            end
+                        elseif (element:IsA("Frame") or element:IsA("ImageLabel")) and element.Visible then
+                            local nameLower = string.lower(element.Name)
+                            if string.find(nameLower, "loading") or string.find(nameLower, "intro") or string.find(nameLower, "transition") or string.find(nameLower, "teleport") then
+                                element.Visible = false
                             end
                         end
                     end
@@ -917,6 +914,7 @@ task.spawn(function()
     local lastPathCompute = 0
     local walkWaypoints = {}
     local currentWPIndex = 1
+    local calculatingPath = false
     
     while task.wait(0.1) do
         if Config.AutoRemoveOtherGardens and (os.clock() - lastGardenClean > 1.5) then
@@ -996,33 +994,45 @@ task.spawn(function()
                             elseif Config.TeleportMode == "Walk" then
                                 local dist = (rootPart.Position - petRoot.Position).Magnitude
                                 if dist > 6 then
-                                    if os.clock() - lastPathCompute > 1.2 or #walkWaypoints == 0 or currentWPIndex > #walkWaypoints then
+                                    -- ASYNCHRONOUS NON-BLOCKING PATH COMPUTATION TO PREVENT COROUTINE STUTTER DELAY
+                                    if (os.clock() - lastPathCompute > 1.0) and not calculatingPath then
+                                        calculatingPath = true
                                         lastPathCompute = os.clock()
-                                        local path = PathfindingService:CreatePath({
-                                            AgentRadius = 2,
-                                            AgentHeight = 5,
-                                            AgentCanJump = true,
-                                            WaypointSpacing = 4
-                                        })
-                                        local success = pcall(function()
-                                            path:ComputeAsync(rootPart.Position, petRoot.Position)
+                                        task.spawn(function()
+                                            local path = PathfindingService:CreatePath({
+                                                AgentRadius = 2,
+                                                AgentHeight = 5,
+                                                AgentCanJump = true,
+                                                WaypointSpacing = 4
+                                            })
+                                            local success = pcall(function()
+                                                path:ComputeAsync(rootPart.Position, petRoot.Position)
+                                            end)
+                                            
+                                            if success and path.Status == Enum.PathStatus.Success then
+                                                walkWaypoints = path:GetWaypoints()
+                                                currentWPIndex = 2
+                                            else
+                                                walkWaypoints = {}
+                                            end
+                                            calculatingPath = false
                                         end)
-                                        
-                                        if success and path.Status == Enum.PathStatus.Success then
-                                            walkWaypoints = path:GetWaypoints()
-                                            currentWPIndex = 1
-                                        else
-                                            walkWaypoints = {}
-                                        end
                                     end
                                     
+                                    -- Dynamic waypoint traversal anti-stuck framework
                                     if #walkWaypoints > 0 and currentWPIndex <= #walkWaypoints then
                                         local wp = walkWaypoints[currentWPIndex]
                                         if wp.Action == Enum.PathWaypointAction.Jump then
                                             humanoid.Jump = true
                                         end
                                         humanoid:MoveTo(wp.Position)
-                                        if (rootPart.Position - wp.Position).Magnitude <= 4 then
+                                        
+                                        -- Auto step velocity unlocker
+                                        if rootPart.AssemblyLinearVelocity.Magnitude < 1.5 and humanoid.MoveDirection.Magnitude > 0 then
+                                            humanoid.Jump = true
+                                        end
+                                        
+                                        if (rootPart.Position - wp.Position).Magnitude <= 4.5 then
                                             currentWPIndex = currentWPIndex + 1
                                         end
                                     else
