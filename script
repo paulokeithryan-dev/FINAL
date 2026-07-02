@@ -37,6 +37,7 @@ local Config = {
     
     -- MISC OPTIMIZATION & ADVANCED CONTROLS
     AutoRemoveOtherGardens = false,
+    AutoReduceLag = false,
     FullBright = false,
     InfiniteZoom = false,
     AntiFling = false,
@@ -332,6 +333,7 @@ local function loadConfig()
                 "PetHuntEnabled", "ProtectionEnabled", "ProtectionRadius", "AutoRemoveOtherGardens",
                 "FullBright", "InfiniteZoom", "AntiFling", "LessKnockback", 
                 "InstantPrompt", "BypassGameplayPaused", "ESPEnabled",
+                "AutoReduceLag",
                 "ESPSelectedPets", "ESPSelectedRarities", "ESPSelectedSizes",
                 "TeleportMode", "ServerHopEnabled", "MaxServerPlayers", "SkipLoadingScreen",
                 "FlyHeight", "TweenSpeed", "CombatDashSpeed"
@@ -719,6 +721,10 @@ task.spawn(function()
         if Config.AutoRemoveOtherGardens and (os.clock() - lastGardenClean > 1.5) then
             lastGardenClean = os.clock()
             removeOtherGardensInstantly()
+        end
+
+        if Config.AutoReduceLag then
+            applyAggressiveLagReduction()
         end
         
         if Config.PetHuntEnabled and not isProcessingHopLifecycle then
@@ -1726,6 +1732,11 @@ ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", f
     applyAggressiveLagReduction()
     print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
 end)
+
+ViewCreator.AddToggleCard(MiscScroll, "Auto Reduce Lag (Loop)", Config.AutoReduceLag, function(bool)
+    Config.AutoReduceLag = bool
+    if bool then applyAggressiveLagReduction() end
+end, "AutoReduceLag")
 
 ViewCreator.AddSectionHeader(MiscScroll, "Environment")
 
