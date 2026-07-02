@@ -1,6 +1,6 @@
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 6.2 (STABLE MOVEMENT MASTER ENGINE)
--- OPTIMIZED & BUG-FIXED RECON EDITION
+-- PREMIUM UI ENGINE - VERSION 6.3 (STABLE MOVEMENT MASTER ENGINE)
+-- OPTIMIZED & BUG-FIXED RECON EDITION - AUCTIONEER & CMDR INTEGRATED
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -53,7 +53,17 @@ local Config = {
     
     -- SETTINGS CONTROL MATRIX
     TeleportMode = "Tween",
-    SkipLoadingScreen = false
+    SkipLoadingScreen = false,
+
+    -- AUCTIONEER SNIPER CONFIG (NEW V6.3)
+    AuctionSniperEnabled = false,
+    AuctionMaxPrice = 1000000,
+    AuctionTargetItem = "Ice Serpent",
+    AuctionAutoRarity = "Super",
+    
+    -- CMDR & NETWORK (NEW V6.3)
+    CmdrLoggerEnabled = false,
+    AutoJoinPetHunt = false
 }
 
 -- Registry to track UI toggle elements for dynamic visual updates
@@ -83,6 +93,7 @@ local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 local PathfindingService = game:GetService("PathfindingService")
 local TeleportService = game:GetService("TeleportService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local PLACE_ID = game.PlaceId
 
@@ -120,6 +131,49 @@ local RarityHexColors = {
     ["Super"] = "#FF00FF",        
     ["Unknown"] = "#FFFFFF"
 }
+
+-- ---------------------------------------------------------------------
+-- AUCTIONEER MATH & NETWORK ENGINE (NEW V6.3)
+-- ---------------------------------------------------------------------
+local AuctioneerMath = {
+    CurrentPrice = function(lot, now)
+        if lot.decrementIntervalSeconds <= 0 then return lot.startPrice end
+        local elapsed = math.max(0, now - lot.rolledAt)
+        local ticks = math.floor(elapsed / lot.decrementIntervalSeconds)
+        local decAmt = math.round(lot.startPrice * lot.decrementPercent / 100)
+        return math.max(lot.minPrice, lot.startPrice - (decAmt * ticks))
+    end
+}
+
+local function attemptAuctionPurchase(lotId, price)
+    local network = ReplicatedStorage:FindFirstChild("Network")
+    if network then
+        local purchaseRemote = network:FindFirstChild("AuctioneerPurchaseLot")
+        if purchaseRemote and purchaseRemote:IsA("RemoteFunction") then
+            print("[SNIPER]: Firing purchase signal for Lot: " .. tostring(lotId) .. " at Price: " .. tostring(price))
+            local success, result = pcall(function()
+                return purchaseRemote:InvokeServer(lotId, price)
+            end)
+            return success, result
+        end
+    end
+    return false, "Remote not found"
+end
+
+-- ---------------------------------------------------------------------
+-- CMDR EVENT LISTENER (NEW V6.3)
+-- ---------------------------------------------------------------------
+task.spawn(function()
+    local cmdr = ReplicatedStorage:FindFirstChild("Cmdr")
+    local cmdrEvent = cmdr and cmdr:FindFirstChild("CmdrEvent")
+    if cmdrEvent and cmdrEvent:IsA("RemoteEvent") then
+        cmdrEvent.OnClientEvent:Connect(function(eventName, ...)
+            if Config.CmdrLoggerEnabled then
+                print("[CMDR_LOG]: Event [" .. tostring(eventName) .. "] Data: ", ...)
+            end
+        end)
+    end
+end)
 
 -- Global Teleport Error Handler
 TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
@@ -336,7 +390,9 @@ local function loadConfig()
                 "AutoReduceLag",
                 "ESPSelectedPets", "ESPSelectedRarities", "ESPSelectedSizes",
                 "TeleportMode", "ServerHopEnabled", "MaxServerPlayers", "SkipLoadingScreen",
-                "FlyHeight", "TweenSpeed", "CombatDashSpeed"
+                "FlyHeight", "TweenSpeed", "CombatDashSpeed",
+                "AuctionSniperEnabled", "AuctionMaxPrice", "AuctionTargetItem", "AuctionAutoRarity",
+                "CmdrLoggerEnabled", "AutoJoinPetHunt"
             }
             
             for _, key in ipairs(simpleElements) do
@@ -711,6 +767,7 @@ end)
 task.spawn(function()
     local lastPromptCheck = 0
     local lastGardenClean = 0
+    local lastAuctionCheck = 0
     local isProcessingHopLifecycle = false
     
     local lastPathCompute = 0
@@ -725,6 +782,30 @@ task.spawn(function()
 
         if Config.AutoReduceLag then
             applyAggressiveLagReduction()
+        end
+
+        if Config.AutoJoinPetHunt then
+            local network = ReplicatedStorage:FindFirstChild("Network")
+            local joinRemote = network and network:FindFirstChild("PetHuntJoinQueue")
+            if joinRemote then pcall(function() joinRemote:InvokeServer("Public") end) end
+        end
+
+        if Config.AuctionSniperEnabled and (os.clock() - lastAuctionCheck > 0.5) then
+            lastAuctionCheck = os.clock()
+            local network = ReplicatedStorage:FindFirstChild("Network")
+            local requestSnapshot = network and network:FindFirstChild("AuctioneerRequestSnapshot")
+            if requestSnapshot then
+                local success, snapshot = pcall(function() return requestSnapshot:InvokeServer() end)
+                if success and snapshot and snapshot.lots then
+                    for id, lot in pairs(snapshot.lots) do
+                        local currentPrice = AuctioneerMath.CurrentPrice(lot, os.time())
+                        local itemName = lot.displayName or lot.item or "Unknown"
+                        if (itemName == Config.AuctionTargetItem or lot.rarity == Config.AuctionAutoRarity) and currentPrice <= Config.AuctionMaxPrice then
+                            attemptAuctionPurchase(id, currentPrice)
+                        end
+                    end
+                end
+            end
         end
         
         if Config.PetHuntEnabled and not isProcessingHopLifecycle then
@@ -767,7 +848,7 @@ task.spawn(function()
                     
                     local capturedSuccessfully = false
                     
-                    while Config.PetHuntEnabled and activeTarget and activeTarget:IsDescendantOf(wildFolder) and petRoot do
+                    while activeTarget and activeTarget.Parent == wildFolder and Config.PetHuntEnabled do
                         local closestThief = nil
                         if Config.ProtectionEnabled then
                             for _, player in ipairs(Players:GetPlayers()) do
@@ -1107,80 +1188,68 @@ function Sidebar:RegisterTab(tabName, iconText, associatedViewFrame)
     end)
     
     table.insert(self.Buttons, Btn)
-    
-    if order == 1 then
-        associatedViewFrame.Visible = true
+    if #self.Buttons == 1 then
         Btn.BackgroundColor3 = Color3.fromRGB(32, 32, 36)
         Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         ActiveStrip.Visible = true
+        associatedViewFrame.Visible = true
     else
         associatedViewFrame.Visible = false
     end
 end
 
--- ---------------------------------------------------------------------
--- INTERFACE RENDERING ENGINE MATRIX
--- ---------------------------------------------------------------------
 local ViewCreator = {}
 
-function ViewCreator.SetupCanvas(titleName, viewContainer)
-    local ViewFrame = Instance.new("Frame")
-    ViewFrame.Size = UDim2.new(1, 0, 1, 0)
-    ViewFrame.BackgroundTransparency = 1
-    ViewFrame.Visible = false
-    ViewFrame.Parent = viewContainer
+function ViewCreator.SetupCanvas(titleText, container)
+    local View = Instance.new("Frame")
+    View.Size = UDim2.new(1, 0, 1, 0)
+    View.BackgroundTransparency = 1
+    View.Parent = container
     
-    local HeaderTitle = Instance.new("TextLabel")
-    HeaderTitle.Size = UDim2.new(1, -40, 0, 32)
-    HeaderTitle.Position = UDim2.new(0, 0, 0, 5)
-    HeaderTitle.BackgroundTransparency = 1
-    HeaderTitle.Text = titleName
-    HeaderTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    HeaderTitle.TextSize = 22
-    HeaderTitle.Font = Enum.Font.GothamBold
-    HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
-    HeaderTitle.Parent = ViewFrame
+    local Header = Instance.new("TextLabel")
+    Header.Size = UDim2.new(1, 0, 0, 24)
+    Header.BackgroundTransparency = 1
+    Header.Text = titleText
+    Header.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Header.TextSize = 18
+    Header.Font = Enum.Font.GothamBold
+    Header.TextXAlignment = Enum.TextXAlignment.Left
+    Header.Parent = View
     
     local Scroll = Instance.new("ScrollingFrame")
-    Scroll.Size = UDim2.new(1, 0, 1, -45)
-    Scroll.Position = UDim2.new(0, 0, 0, 45)
+    Scroll.Size = UDim2.new(1, 0, 1, -35)
+    Scroll.Position = UDim2.new(0, 0, 0, 35)
     Scroll.BackgroundTransparency = 1
     Scroll.BorderSizePixel = 0
-    Scroll.ScrollBarThickness = 4
-    Scroll.ScrollBarImageColor3 = Color3.fromRGB(65, 65, 70)
-    Scroll.Active = true 
-    Scroll.Parent = ViewFrame
+    Scroll.ScrollBarThickness = 3
+    Scroll.ScrollBarImageColor3 = Color3.fromRGB(45, 45, 48)
+    Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    Scroll.Parent = View
     
-    local ListLayout = Instance.new("UIListLayout")
-    ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    ListLayout.Padding = UDim.new(0, 6)
-    ListLayout.Parent = Scroll
+    local Layout = Instance.new("UIListLayout")
+    Layout.Padding = UDim.new(0, 6)
+    Layout.SortOrder = Enum.SortOrder.LayoutOrder
+    Layout.Parent = Scroll
     
-    ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        Scroll.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 12)
+    Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        Scroll.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 10)
     end)
     
-    return ViewFrame, Scroll
+    return View, Scroll
 end
 
-function ViewCreator.AddSectionHeader(scrollTarget, text)
-    local SectionFrame = Instance.new("Frame")
-    SectionFrame.Size = UDim2.new(1, -8, 0, 24)
-    SectionFrame.BackgroundTransparency = 1
-    SectionFrame.Parent = scrollTarget
-    
-    local HeaderLabel = Instance.new("TextLabel")
-    HeaderLabel.Size = UDim2.new(1, 0, 1, 0)
-    HeaderLabel.BackgroundTransparency = 1
-    HeaderLabel.Text = "— [ " .. text .. " ] —"
-    HeaderLabel.TextColor3 = Color3.fromRGB(180, 75, 75)
-    HeaderLabel.TextSize = 12
-    HeaderLabel.Font = Enum.Font.GothamBold
-    HeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
-    HeaderLabel.Parent = SectionFrame
+function ViewCreator.AddSectionHeader(scrollTarget, headerText)
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, 0, 0, 20)
+    Label.BackgroundTransparency = 1
+    Label.Text = "— [ " .. headerText .. " ] —"
+    Label.TextColor3 = Color3.fromRGB(85, 85, 90)
+    Label.TextSize = 10
+    Label.Font = Enum.Font.GothamBold
+    Label.Parent = scrollTarget
 end
 
-function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickEvent, registryKey)
+function ViewCreator.AddToggleCard(scrollTarget, labelText, defaultState, onToggleEvent, registryKey)
     local Card = Instance.new("Frame")
     Card.Size = UDim2.new(1, -8, 0, 42)
     Card.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
@@ -1203,49 +1272,41 @@ function ViewCreator.AddToggleCard(scrollTarget, labelText, checkState, onClickE
     CardTitle.TextXAlignment = Enum.TextXAlignment.Left
     CardTitle.Parent = Card
     
-    local ToggleFrame = Instance.new("TextButton")
-    ToggleFrame.Size = UDim2.new(0, 42, 0, 20)
-    ToggleFrame.Position = UDim2.new(1, -54, 0.5, -10)
-    ToggleFrame.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
-    ToggleFrame.Text = ""
-    ToggleFrame.Parent = Card
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Size = UDim2.new(0, 36, 0, 20)
+    ToggleBtn.Position = UDim2.new(1, -48, 0.5, -10)
+    ToggleBtn.BackgroundColor3 = defaultState and Color3.fromRGB(45, 200, 110) or Color3.fromRGB(55, 55, 60)
+    ToggleBtn.Text = ""
+    ToggleBtn.Parent = Card
     
-    local ToggleCorner = Instance.new("UICorner")
-    ToggleCorner.CornerRadius = UDim.new(1, 0)
-    ToggleCorner.Parent = ToggleFrame
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(1, 0)
+    BtnCorner.Parent = ToggleBtn
     
-    local SliderDot = Instance.new("Frame")
-    SliderDot.Size = UDim2.new(0, 14, 0, 14)
-    SliderDot.Position = UDim2.new(0, 3, 0.5, -7)
-    SliderDot.BackgroundColor3 = Color3.fromRGB(150, 150, 155)
-    SliderDot.BorderSizePixel = 0
-    SliderDot.Parent = ToggleFrame
+    local Indicator = Instance.new("Frame")
+    Indicator.Size = UDim2.new(0, 14, 0, 14)
+    Indicator.Position = defaultState and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+    Indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Indicator.BorderSizePixel = 0
+    Indicator.Parent = ToggleBtn
     
-    local DotCorner = Instance.new("UICorner")
-    DotCorner.CornerRadius = UDim.new(1, 0)
-    DotCorner.Parent = SliderDot
+    local IndCorner = Instance.new("UICorner")
+    IndCorner.CornerRadius = UDim.new(1, 0)
+    IndCorner.Parent = Indicator
     
-    local currentState = checkState
-    local function updateVisuals(enabled)
-        currentState = enabled
-        if enabled then
-            ToggleFrame.BackgroundColor3 = Color3.fromRGB(0, 180, 110)
-            SliderDot.Position = UDim2.new(1, -17, 0.5, -7)
-            SliderDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        else
-            ToggleFrame.BackgroundColor3 = Color3.fromRGB(42, 42, 48)
-            SliderDot.Position = UDim2.new(0, 3, 0.5, -7)
-            SliderDot.BackgroundColor3 = Color3.fromRGB(150, 150, 155)
-        end
+    local state = defaultState
+    local function updateVisuals(bool)
+        state = bool
+        ToggleBtn.BackgroundColor3 = state and Color3.fromRGB(45, 200, 110) or Color3.fromRGB(55, 55, 60)
+        Indicator.Position = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
     end
     
     if registryKey then ToggleRegistry[registryKey] = updateVisuals end
-    updateVisuals(currentState)
     
-    ToggleFrame.MouseButton1Click:Connect(function()
-        currentState = not currentState
-        updateVisuals(currentState)
-        onClickEvent(currentState)
+    ToggleBtn.MouseButton1Click:Connect(function()
+        state = not state
+        updateVisuals(state)
+        onToggleEvent(state)
     end)
 end
 
@@ -1649,7 +1710,6 @@ function ViewCreator.AddSingleDropdownCard(scrollTarget, labelText, defaultText,
             currentSelection = option
             for _, updater in pairs(optionVisualUpdaters) do updater() end
             updateMainButtonText()
-            toggleDropdown()
         end)
     end
     updateMainButtonText()
@@ -1662,6 +1722,7 @@ local App = BaseLayout.new()
 local Nav = Sidebar.new(App.Sidebar)
 
 local HuntView, HuntScroll = ViewCreator.SetupCanvas("Pet Interception System", App.ViewContainer)
+local AuctionView, AuctionScroll = ViewCreator.SetupCanvas("Auction Sniper System", App.ViewContainer)
 local MiscView, MiscScroll = ViewCreator.SetupCanvas("More FPS & Optimization", App.ViewContainer)
 local SettingsView, SettingsScroll = ViewCreator.SetupCanvas("Core Navigation Engine", App.ViewContainer)
 local ConfigView, ConfigScroll = ViewCreator.SetupCanvas("Config Manager (JSON)", App.ViewContainer)
@@ -1714,8 +1775,40 @@ ViewCreator.AddActionCard(HuntScroll, "Manual Trigger Room Rotation", "Hop Serve
 end)
 
 -- ---------------------------------------------------------------------
--- TAB 2: MISCELLANEOUS GAMEPLAY & PERFORMANCE ENGINE OPTIONS
+-- TAB 2: AUCTION SNIPER ENGINE (NEW V6.3)
 -- ---------------------------------------------------------------------
+ViewCreator.AddSectionHeader(AuctionScroll, "Auction Sniper")
+
+ViewCreator.AddToggleCard(AuctionScroll, "🛒 ENABLE AUCTION SNIPER", Config.AuctionSniperEnabled, function(bool)
+    Config.AuctionSniperEnabled = bool
+end, "AuctionSniperEnabled")
+
+ViewCreator.AddInputCard(AuctionScroll, "Target Item Name", Config.AuctionTargetItem, function(val)
+    Config.AuctionTargetItem = val
+end, "AuctionTargetItem")
+
+ViewCreator.AddInputCard(AuctionScroll, "Maximum Bid Price", tostring(Config.AuctionMaxPrice), function(val)
+    Config.AuctionMaxPrice = tonumber(val) or 1000000
+end, "AuctionMaxPrice")
+
+local auctionRarityOptions = {"None", "Common", "Uncommon", "Rare", "Legendary", "Mythic", "Super"}
+ViewCreator.AddSingleDropdownCard(AuctionScroll, "Auto-Snipe by Rarity", Config.AuctionAutoRarity, auctionRarityOptions, function(val)
+    Config.AuctionAutoRarity = val
+end, "AuctionAutoRarity")
+
+-- ---------------------------------------------------------------------
+-- TAB 3: MISCELLANEOUS GAMEPLAY & PERFORMANCE ENGINE OPTIONS
+-- ---------------------------------------------------------------------
+ViewCreator.AddSectionHeader(MiscScroll, "Automation")
+
+ViewCreator.AddToggleCard(MiscScroll, "🎟️ Auto Join Pet Hunt Queue", Config.AutoJoinPetHunt, function(bool)
+    Config.AutoJoinPetHunt = bool
+end, "AutoJoinPetHunt")
+
+ViewCreator.AddToggleCard(MiscScroll, "📜 Cmdr Event Logger (Console)", Config.CmdrLoggerEnabled, function(bool)
+    Config.CmdrLoggerEnabled = bool
+end, "CmdrLoggerEnabled")
+
 ViewCreator.AddSectionHeader(MiscScroll, "Map Controls")
 
 ViewCreator.AddActionCard(MiscScroll, "Remove Other Gardens", "Clean", function()
@@ -1806,7 +1899,7 @@ ViewCreator.AddToggleCard(MiscScroll, "ESP Spawned Pets", Config.ESPEnabled, fun
 end, "ESPEnabled")
 
 -- ---------------------------------------------------------------------
--- TAB 3: SETTINGS ENGINE CONFIGURATION (TELEPORT MANAGER RECON)
+-- TAB 4: SETTINGS ENGINE CONFIGURATION (TELEPORT MANAGER RECON)
 -- ---------------------------------------------------------------------
 ViewCreator.AddSectionHeader(SettingsScroll, "Movement Control Parameters")
 
@@ -1836,7 +1929,7 @@ ViewCreator.AddToggleCard(SettingsScroll, "⚡ INSTANT SKIP LOADING SCREEN", Con
 end, "SkipLoadingScreen")
 
 -- ---------------------------------------------------------------------
--- TAB 4: CONFIG MANAGE SYSTEM (JSON DRIVEN)
+-- TAB 5: CONFIG MANAGE SYSTEM (JSON DRIVEN)
 -- ---------------------------------------------------------------------
 ViewCreator.AddActionCard(ConfigScroll, "Save Current System Settings", "Save Config", function()
     saveConfig()
@@ -1848,6 +1941,7 @@ end)
 
 -- Register Sidebar Matrix Components
 Nav:RegisterTab("Pet Hunter", "🐾", HuntView)
+Nav:RegisterTab("Auction", "⚖️", AuctionView)
 Nav:RegisterTab("Misc", "⚙️", MiscView)
 Nav:RegisterTab("Settings", "🛠️", SettingsView)
 Nav:RegisterTab("Configs", "💾", ConfigView)
@@ -1855,7 +1949,7 @@ Nav:RegisterTab("Configs", "💾", ConfigView)
 -- Automated Workspace State Setup: Auto Load JSON Configuration File
 pcall(loadConfig)
 
-print("[SYSTEM]: Layout Engine Version 6.2 fully configured. Server Hop Matrix online.")
+print("[SYSTEM]: Layout Engine Version 6.3 fully configured. Server Hop Matrix online.")
 
 
 -- =============================================================================
