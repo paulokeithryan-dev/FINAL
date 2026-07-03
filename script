@@ -90,9 +90,11 @@ end
 local function updateESPCache(cacheType, commaStr)
     ESPCache[cacheType] = {}
     if commaStr and commaStr ~= "None" and commaStr ~= "Select Options" and commaStr ~= "" then
-        for token in string.gmatch(commaStr, "[^,%s]+") do
-            local cleanToken = string.lower(string.gsub(token, "%s+", ""))
-            ESPCache[cacheType][cleanToken] = true
+        for token in string.gmatch(commaStr, "[^,]+") do
+            local cleanToken = string.lower(string.gsub(token, "[%s%p]+", ""))
+            if cleanToken ~= "" then
+                ESPCache[cacheType][cleanToken] = true
+            end
         end
     end
 end
@@ -1113,7 +1115,15 @@ function BaseLayout.new()
         self.MainWindow.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 
-    self.DragBar.InputBegan:Connect(function(input)
+    -- Cleanup previous connections if re-running
+    if _G.SleekUICleanup then _G.SleekUICleanup() end
+    local connections = {}
+    _G.SleekUICleanup = function()
+        for _, c in ipairs(connections) do c:Disconnect() end
+        table.clear(connections)
+    end
+
+    table.insert(connections, self.DragBar.InputBegan:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
             if UserInputService:GetFocusedTextBox() then return end
             dragging = true
