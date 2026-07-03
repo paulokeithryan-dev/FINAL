@@ -152,6 +152,14 @@ local RarityHexColors = {
 -- ---------------------------------------------------------------------
 -- Cooldown variables removed for multi-buy functionality
 
+local function serverNow()
+    local ok, result = pcall(function()
+        return workspace:GetServerTimeNow()
+    end)
+    if ok then return result end
+    return os.time()
+end
+
 local AuctioneerMath = {
     CurrentPrice = function(p1, p2)
         if p1.decrementIntervalSeconds <= 0 then
@@ -840,11 +848,11 @@ task.spawn(function()
             lastAuctionCheck = os.clock()
             local requestSnapshot = Networking.Auctioneer.RequestSnapshot
             
-            if requestSnapshot and requestSnapshot:IsA("RemoteFunction") then
-                local success, snapshot = pcall(function() return requestSnapshot:InvokeServer() end)
-                if success and snapshot and snapshot.lots then
-                    for id, lot in pairs(snapshot.lots) do
-                        local currentPrice = AuctioneerMath.CurrentPrice(lot, os.time())
+            if requestSnapshot then
+                local success, snapshot = pcall(function() return requestSnapshot:Fire() end)
+                if success and snapshot and snapshot.manifest and snapshot.manifest.lots then
+                    for id, lot in pairs(snapshot.manifest.lots) do
+                        local currentPrice = AuctioneerMath.CurrentPrice(lot, serverNow())
                         local itemName = AuctioneerMath.DisplayName(lot)
                         local cleanItemName = string.lower(string.gsub(itemName, "%s+", ""))
                         local baseItemName = string.lower(string.gsub(lot.item or "", "%s+", ""))
@@ -1000,20 +1008,16 @@ task.spawn(function()
                     deployPurchaseInterception(nil, rootPart)
                     print("[HUNTER]: Target tracking concluded.")
                     
-                    if capturedSuccessfully and Config.ServerHopEnabled and Config.PetHuntEnabled then
+                    if capturedSuccessfully and Config.ServerHopEnabled then
+                        print("[HUNTER]: Capture lifecycle complete. Transitioning room state...")
                         isProcessingHopLifecycle = true
-                        print("[PET_FINDER]: Target signature captured! Enforcing 40-second static cooldown before initiating room rotation...")
-                        task.wait(40)
-                        if Config.PetHuntEnabled then rotateServerInstance() end
-                        isProcessingHopLifecycle = false
-                    end
-                else
-                    if Config.ServerHopEnabled then
-                        isProcessingHopLifecycle = true
-                        print("[PET_FINDER]: Zero target signatures detected across map boundaries during this session cycle.")
+                        task.wait(1.5)
                         rotateServerInstance()
-                        isProcessingHopLifecycle = false
                     end
+                elseif Config.ServerHopEnabled then
+                    print("[HUNTER]: No targets in current instance. Rotating server...")
+                    isProcessingHopLifecycle = true
+                    rotateServerInstance()
                 end
             end
         end
