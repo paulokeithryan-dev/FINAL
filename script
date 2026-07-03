@@ -195,14 +195,25 @@ local function attemptAuctionPurchase(lotId, price, itemName)
     local purchaseRemote = Networking.Auctioneer.PurchaseLot
     
     if purchaseRemote then
-        print("[SHOP]: Attempting to Auto-Buy: " .. tostring(itemName) .. " for " .. tostring(price) .. " coins.")
+        print("[SHOP]: Attempting to Auto-Buy: " .. tostring(itemName) .. " (ID: " .. tostring(lotId) .. ") for " .. tostring(price) .. " coins.")
         
-        local success, result = pcall(function() purchaseRemote:Fire(lotId, price) end)
+        local success, result = pcall(function() 
+            if purchaseRemote:IsA("RemoteEvent") then
+                purchaseRemote:FireServer(lotId, price)
+            elseif purchaseRemote:IsA("UnreliableRemoteEvent") then
+                purchaseRemote:FireServer(lotId, price)
+            elseif purchaseRemote:IsA("RemoteFunction") then
+                return purchaseRemote:InvokeServer(lotId, price)
+            else
+                -- Fallback to Fire if it's a custom wrapper
+                return purchaseRemote:Fire(lotId, price)
+            end
+        end)
         
         if success then
-            print("[SHOP]: Purchase request sent successfully.")
+            print("[SHOP]: Purchase request dispatched successfully.")
         else
-            print("[SHOP]: Purchase failed: " .. tostring(result))
+            warn("[SHOP ERROR]: Purchase execution failed: " .. tostring(result))
         end
         return success, result
     end
@@ -851,7 +862,14 @@ task.spawn(function()
             local requestSnapshot = Networking.Auctioneer.RequestSnapshot
             
             if requestSnapshot then
-                local success, snapshot = pcall(function() return requestSnapshot:Fire() end)
+                local success, snapshot = pcall(function() 
+                    if requestSnapshot:IsA("RemoteFunction") then
+                        return requestSnapshot:InvokeServer()
+                    else
+                        return requestSnapshot:Fire()
+                    end
+                end)
+                
                 if success and snapshot and snapshot.manifest and snapshot.manifest.lots then
                     for _, lot in pairs(snapshot.manifest.lots) do
                         local lotId = lot.lotId
@@ -868,6 +886,11 @@ task.spawn(function()
                                 isTargeted = true
                                 break
                             end
+                        end
+                        
+                        -- DIAGNOSTIC LOGGING
+                        if Config.CmdrLoggerEnabled then
+                            print(string.format("[AUCTION SCAN]: Found: %s | Base: %s | Target: %s", itemName, lot.item or "N/A", tostring(isTargeted)))
                         end
                         
                         if isTargeted then
