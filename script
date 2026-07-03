@@ -55,13 +55,14 @@ local Config = {
     TeleportMode = "Tween",
     SkipLoadingScreen = false,
 
-        -- AUCTIONEER SNIPER CONFIG (NEW V6.3)
-    AuctionSniperEnabled = false,
-    AuctionMaxPrice = 1000000,
-    AuctionTargetItem = "Ice Serpent",
-    AuctionAutoRarity = "Super",
+        -- SHOP & AUCTION CONFIG (NEW V6.3)
+    AutoBuyAuction = false,
+    AuctionPrice = 0,
+    AuctionPriceMode = "Above",
     AuctionTargetSeeds = "Select Options",
     AuctionTargetGear = "Select Options",
+    AuctionTargetPacks = "Select Options",
+    AuctionTargetEggs = "Select Options",
     
     -- CMDR & NETWORK (NEW V6.3)
     CmdrLoggerEnabled = false,
@@ -74,7 +75,7 @@ local activeTween = nil
 
 -- High Performance ESP Cache Lookup Tables
 local ESPCache = { Pets = {}, Rarities = {}, Sizes = {} }
-local AuctionCache = { Seeds = {}, Gear = {} }
+local AuctionCache = { Seeds = {}, Gear = {}, Packs = {}, Eggs = {} }
 local function updateAuctionCache(cacheType, commaStr)
     AuctionCache[cacheType] = {}
     if commaStr and commaStr ~= "None" and commaStr ~= "Select Options" and commaStr ~= "" then
@@ -417,7 +418,8 @@ local function loadConfig()
                 "ESPSelectedPets", "ESPSelectedRarities", "ESPSelectedSizes",
                 "TeleportMode", "ServerHopEnabled", "MaxServerPlayers", "SkipLoadingScreen",
                 "FlyHeight", "TweenSpeed", "CombatDashSpeed",
-                "AuctionSniperEnabled", "AuctionMaxPrice", "AuctionTargetItem", "AuctionAutoRarity", "AuctionTargetSeeds", "AuctionTargetGear",
+                "AutoBuyAuction", "AuctionPrice", "AuctionPriceMode", 
+                "AuctionTargetSeeds", "AuctionTargetGear", "AuctionTargetPacks", "AuctionTargetEggs",
                 "CmdrLoggerEnabled", "AutoJoinPetHunt"
             }
             
@@ -436,6 +438,8 @@ local function loadConfig()
                         updateESPCache("Sizes", Config.ESPSelectedSizes)
             updateAuctionCache("Seeds", Config.AuctionTargetSeeds)
             updateAuctionCache("Gear", Config.AuctionTargetGear)
+            updateAuctionCache("Packs", Config.AuctionTargetPacks)
+            updateAuctionCache("Eggs", Config.AuctionTargetEggs)
             
             print("[CONFIG]: Setup configuration loaded and applied successfully.")
         end
@@ -818,7 +822,7 @@ task.spawn(function()
             if joinRemote then pcall(function() joinRemote:InvokeServer("Public") end) end
         end
 
-        if Config.AuctionSniperEnabled and (os.clock() - lastAuctionCheck > 0.5) then
+        if Config.AutoBuyAuction and (os.clock() - lastAuctionCheck > 0.5) then
             lastAuctionCheck = os.clock()
             local network = ReplicatedStorage:FindFirstChild("Network")
             local requestSnapshot = network and network:FindFirstChild("AuctioneerRequestSnapshot")
@@ -831,15 +835,24 @@ task.spawn(function()
                         local cleanItemName = string.lower(string.gsub(itemName, "%s+", ""))
                         local baseItemName = string.lower(string.gsub(lot.item or "", "%s+", ""))
                         
-                        local isTargeted = (itemName == Config.AuctionTargetItem) or 
-                                         (lot.rarity == Config.AuctionAutoRarity) or
-                                         (AuctionCache.Seeds[cleanItemName]) or
-                                         (AuctionCache.Gear[cleanItemName]) or
-                                         (AuctionCache.Seeds[baseItemName]) or
-                                         (AuctionCache.Gear[baseItemName])
+                        local isTargeted = (AuctionCache.Seeds[cleanItemName] or AuctionCache.Seeds[baseItemName]) or
+                                         (AuctionCache.Gear[cleanItemName] or AuctionCache.Gear[baseItemName]) or
+                                         (AuctionCache.Packs[cleanItemName] or AuctionCache.Packs[baseItemName]) or
+                                         (AuctionCache.Eggs[cleanItemName] or AuctionCache.Eggs[baseItemName])
                         
-                        if isTargeted and currentPrice <= Config.AuctionMaxPrice then
-                            attemptAuctionPurchase(id, currentPrice)
+                        if isTargeted then
+                            local priceCondition = false
+                            if Config.AuctionPrice == 0 then
+                                priceCondition = true
+                            elseif Config.AuctionPriceMode == "Above" then
+                                priceCondition = (currentPrice >= Config.AuctionPrice)
+                            elseif Config.AuctionPriceMode == "Below" then
+                                priceCondition = (currentPrice <= Config.AuctionPrice)
+                            end
+                            
+                            if priceCondition then
+                                attemptAuctionPurchase(id, currentPrice)
+                            end
                         end
                     end
                 end
@@ -1845,7 +1858,7 @@ local App = BaseLayout.new()
 local Nav = Sidebar.new(App.Sidebar)
 
 local HuntView, HuntScroll = ViewCreator.SetupCanvas("Pet Interception System", App.ViewContainer)
-local AuctionView, AuctionScroll = ViewCreator.SetupCanvas("Auction Sniper System", App.ViewContainer)
+local ShopView, ShopScroll = ViewCreator.SetupCanvas("Shop System", App.ViewContainer)
 local MiscView, MiscScroll = ViewCreator.SetupCanvas("More FPS & Optimization", App.ViewContainer)
 local SettingsView, SettingsScroll = ViewCreator.SetupCanvas("Core Navigation Engine", App.ViewContainer)
 local ConfigView, ConfigScroll = ViewCreator.SetupCanvas("Config Manager (JSON)", App.ViewContainer)
@@ -1898,52 +1911,60 @@ ViewCreator.AddActionCard(HuntScroll, "Manual Trigger Room Rotation", "Hop Serve
 end)
 
 -- ---------------------------------------------------------------------
--- TAB 2: AUCTION SNIPER ENGINE (NEW V6.3)
+-- TAB 2: SHOP & AUCTION ENGINE (NEW V6.3)
 -- ---------------------------------------------------------------------
-local SniperSection = ViewCreator.AddCollapsibleSection(AuctionScroll, "Shop Auction", true)
+local CrateSection = ViewCreator.AddCollapsibleSection(ShopScroll, "Shop Crate", false)
+ViewCreator.AddActionCard(CrateSection, "Crate Shop Automation", "Unavailable", function()
+    print("[SHOP]: Crate shop automation is currently unavailable.")
+end)
 
-ViewCreator.AddToggleCard(SniperSection, "🛒 ENABLE AUCTION SNIPER", Config.AuctionSniperEnabled, function(bool)
-    Config.AuctionSniperEnabled = bool
-end, "AuctionSniperEnabled")
-
-ViewCreator.AddInputCard(SniperSection, "Maximum Bid Price", tostring(Config.AuctionMaxPrice), function(val)
-    Config.AuctionMaxPrice = tonumber(val) or 1000000
-end, "AuctionMaxPrice")
-
-ViewCreator.AddInputCard(SniperSection, "Manual Target Name", Config.AuctionTargetItem, function(val)
-    Config.AuctionTargetItem = val
-end, "AuctionTargetItem")
-
-local auctionRarityOptions = {"None", "Common", "Uncommon", "Rare", "Legendary", "Mythic", "Super"}
-ViewCreator.AddSingleDropdownCard(SniperSection, "Auto-Snipe by Rarity", Config.AuctionAutoRarity, auctionRarityOptions, function(val)
-    Config.AuctionAutoRarity = val
-end, "AuctionAutoRarity")
+local AuctionSection = ViewCreator.AddCollapsibleSection(ShopScroll, "Shop Auction", true)
 
 local seedOptions = {"None", "Acorn", "Apple", "Baby Cactus", "Bamboo", "Banana", "Blueberry", "Briar Rose", "Cactus", "Carrot", "Cherry", "Coconut", "Corn", "Dragon Fruit", "Dragon\'s Breath", "Ghost Pepper", "Glow Mushroom", "Gold", "Grape", "Green Bean", "Horned Melon", "Hypno Bloom", "Mango", "Mega", "Moon Bloom", "Mushroom", "Pineapple", "Poison Apple", "Poison Ivy", "Pomegranate", "Rainbow", "Romanesco", "Strawberry", "Sunflower", "Tomato", "Tulip", "Venom Spitter", "Venus Fly Trap"}
-ViewCreator.AddDropdownCard(SniperSection, "Target Seeds (Multi-Select)", Config.AuctionTargetSeeds, seedOptions, function(selectedValue)
+ViewCreator.AddDropdownCard(AuctionSection, "Select Seed", Config.AuctionTargetSeeds, seedOptions, function(selectedValue)
     Config.AuctionTargetSeeds = selectedValue
     updateAuctionCache("Seeds", selectedValue)
 end, "AuctionTargetSeeds")
 
 local gearOptions = {"None", "Basic Pot", "Common Sprinkler", "Common Watering Can", "Flashbang", "Gnome", "Invisibility Mushroom", "Jump Mushroom", "Legendary Pet Lure", "Legendary Pet Teleporter", "Legendary Sprinkler", "Megaphone", "Mythic Pet Lure", "Mythic Pet Teleporter", "Player Magnet", "Rare Sprinkler", "Shrink Mushroom", "Sign", "Speed Mushroom", "Strawberry Sniper", "Super Pet Lure", "Super Pet Teleporter", "Super Sprinkler", "Super Watering Can", "Supersize Mushroom", "Teleporter", "Trowel", "Uncommon Sprinkler", "Wheelbarrow"}
-ViewCreator.AddDropdownCard(SniperSection, "Target Gear (Multi-Select)", Config.AuctionTargetGear, gearOptions, function(selectedValue)
+ViewCreator.AddDropdownCard(AuctionSection, "Select Gear", Config.AuctionTargetGear, gearOptions, function(selectedValue)
     Config.AuctionTargetGear = selectedValue
     updateAuctionCache("Gear", selectedValue)
 end, "AuctionTargetGear")
 
-local CrateSection = ViewCreator.AddCollapsibleSection(AuctionScroll, "Shop Crate", false)
-ViewCreator.AddActionCard(CrateSection, "Crate Shop Sniper", "Unavailable", function()
-    print("[AUCTION]: Crate shop data is currently unavailable.")
+local packOptions = {"None", "Seed Pack", "Rare Seed Pack", "Epic Seed Pack", "Legendary Seed Pack", "Mythic Seed Pack", "Super Seed Pack"}
+ViewCreator.AddDropdownCard(AuctionSection, "Select Seed Pack", Config.AuctionTargetPacks, packOptions, function(selectedValue)
+    Config.AuctionTargetPacks = selectedValue
+    updateAuctionCache("Packs", selectedValue)
+end, "AuctionTargetPacks")
+
+local eggOptions = {"None", "Common Egg", "Uncommon Egg", "Rare Egg", "Epic Egg", "Legendary Egg", "Mythic Egg", "Super Egg"}
+ViewCreator.AddDropdownCard(AuctionSection, "Select Egg", Config.AuctionTargetEggs, eggOptions, function(selectedValue)
+    Config.AuctionTargetEggs = selectedValue
+    updateAuctionCache("Eggs", selectedValue)
+end, "AuctionTargetEggs")
+
+local priceModeOptions = {"Above", "Below"}
+ViewCreator.AddSingleDropdownCard(AuctionSection, "Auction Price Mode", Config.AuctionPriceMode, priceModeOptions, function(val)
+    Config.AuctionPriceMode = val
+end, "AuctionPriceMode")
+
+ViewCreator.AddInputCard(AuctionSection, "Auction Price", tostring(Config.AuctionPrice), function(val)
+    Config.AuctionPrice = tonumber(val) or 0
+end, "AuctionPrice")
+
+ViewCreator.AddToggleCard(AuctionSection, "Auto Buy Auction", Config.AutoBuyAuction, function(bool)
+    Config.AutoBuyAuction = bool
+end, "AutoBuyAuction")
+
+local GearShopSection = ViewCreator.AddCollapsibleSection(ShopScroll, "Shop Gear", false)
+ViewCreator.AddActionCard(GearShopSection, "Gear Shop Automation", "Unavailable", function()
+    print("[SHOP]: This section is currently a placeholder.")
 end)
 
-local GearSection = ViewCreator.AddCollapsibleSection(AuctionScroll, "Shop Gear", false)
-ViewCreator.AddActionCard(GearSection, "Gear Shop Sniper", "Unavailable", function()
-    print("[AUCTION]: This section is currently a placeholder.")
-end)
-
-local SeedSection = ViewCreator.AddCollapsibleSection(AuctionScroll, "Shop Seeds", false)
-ViewCreator.AddActionCard(SeedSection, "Seed Shop Sniper", "Unavailable", function()
-    print("[AUCTION]: This section is currently a placeholder.")
+local SeedShopSection = ViewCreator.AddCollapsibleSection(ShopScroll, "Shop Seeds", false)
+ViewCreator.AddActionCard(SeedShopSection, "Seed Shop Automation", "Unavailable", function()
+    print("[SHOP]: This section is currently a placeholder.")
 end)
 
 -- ---------------------------------------------------------------------
@@ -2091,7 +2112,7 @@ end)
 
 -- Register Sidebar Matrix Components
 Nav:RegisterTab("Pet Hunter", "🐾", HuntView)
-Nav:RegisterTab("Auction", "⚖️", AuctionView)
+Nav:RegisterTab("Shop", "🛒", ShopView)
 Nav:RegisterTab("Misc", "⚙️", MiscView)
 Nav:RegisterTab("Settings", "🛠️", SettingsView)
 Nav:RegisterTab("Configs", "💾", ConfigView)
