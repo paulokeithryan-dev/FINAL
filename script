@@ -1,5 +1,6 @@
+print("[BOOT]: Script execution initiated. Initializing environment...")
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 6.4 (RESTABLED & STANDALONE EDITION)
+-- PREMIUM UI ENGINE - VERSION 6.4 (STABLE & DEBUG EDITION)
 -- OPTIMIZED & BUG-FIXED RECON EDITION - AUCTIONEER & CMDR INTEGRATED
 -- =====================================================================
 
@@ -112,6 +113,7 @@ local PathfindingService = game:GetService("PathfindingService")
 local TeleportService = game:GetService("TeleportService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
+print("[BOOT]: Service hooks and LocalPlayer established.")
 local PLACE_ID = game.PlaceId
 
 local Networking = require(ReplicatedStorage.SharedModules.Networking)
@@ -202,7 +204,6 @@ local function attemptAuctionPurchase(lotId, price, itemName)
         lastPurchaseTime[lotId] = os.clock()
         print("[SHOP]: Attempting to Auto-Buy: " .. tostring(itemName) .. " (ID: " .. tostring(lotId) .. ") for " .. tostring(price) .. " coins.")
         local success, result = pcall(function() 
-            -- Fire the remote with the price parameter as confirmed in controller
             return purchaseRemote:Fire(lotId, price)
         end)
         if success then
@@ -510,7 +511,6 @@ local function removeOtherGardensInstantly()
     if not gardens then return end
     for _, garden in ipairs(gardens:GetChildren()) do
         if garden:GetAttribute("Owner") ~= LocalPlayer.UserId then
-            -- SAFE: Move to a hidden folder instead of Destroying
             local hidden = workspace:FindFirstChild("HiddenGardens") or Instance.new("Folder", workspace)
             hidden.Name = "HiddenGardens"
             garden.Parent = hidden
@@ -531,7 +531,7 @@ local function applyAggressiveLagReduction()
             if instance:IsA("ParticleEmitter") or instance:IsA("Smoke") or instance:IsA("Sparkles") or instance:IsA("Fire") then
                 instance.Enabled = false
             elseif instance:IsA("Decal") or instance:IsA("Texture") then
-                instance.Transparency = 1 -- SAFE: Hide instead of Destroy
+                instance.Transparency = 1
             elseif instance:IsA("BasePart") then
                 instance.CastShadow = false
                 instance.Material = Enum.Material.SmoothPlastic
