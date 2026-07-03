@@ -147,22 +147,36 @@ local RarityHexColors = {
 -- ---------------------------------------------------------------------
 -- AUCTIONEER MATH & NETWORK ENGINE (NEW V6.3)
 -- ---------------------------------------------------------------------
+local lastPurchaseTime = 0
+local PURCHASE_COOLDOWN = 10.1 -- Based on AuctioneerFlags (10s + small buffer)
+
 local AuctioneerMath = {
     CurrentPrice = function(lot, now)
         if lot.decrementIntervalSeconds <= 0 then return lot.startPrice end
         local elapsed = math.max(0, now - lot.rolledAt)
         local ticks = math.floor(elapsed / lot.decrementIntervalSeconds)
         local decAmt = math.round(lot.startPrice * lot.decrementPercent / 100)
-        return math.max(lot.minPrice, lot.startPrice - (decAmt * ticks))
+        return math.max(lot.minPrice, lot.startPrice - (math.round(decAmt) * ticks))
+    end,
+    DisplayName = function(lot)
+        if lot.displayName and lot.displayName ~= "" then return lot.displayName end
+        local components = {}
+        for _, val in ipairs({lot.type, lot.size, lot.mutation, lot.item}) do
+            if val and val ~= "" then table.insert(components, val) end
+        end
+        return #components > 0 and table.concat(components, " ") or "Unknown Item"
     end
 }
 
 local function attemptAuctionPurchase(lotId, price)
+    if os.clock() - lastPurchaseTime < PURCHASE_COOLDOWN then return false, "Cooldown" end
+    
     local network = ReplicatedStorage:FindFirstChild("Network")
     if network then
         local purchaseRemote = network:FindFirstChild("AuctioneerPurchaseLot")
         if purchaseRemote and purchaseRemote:IsA("RemoteFunction") then
             print("[SNIPER]: Firing purchase signal for Lot: " .. tostring(lotId) .. " at Price: " .. tostring(price))
+            lastPurchaseTime = os.clock()
             local success, result = pcall(function()
                 return purchaseRemote:InvokeServer(lotId, price)
             end)
@@ -813,12 +827,16 @@ task.spawn(function()
                 if success and snapshot and snapshot.lots then
                     for id, lot in pairs(snapshot.lots) do
                         local currentPrice = AuctioneerMath.CurrentPrice(lot, os.time())
-                        local itemName = lot.displayName or lot.item or "Unknown"
+                        local itemName = AuctioneerMath.DisplayName(lot)
                         local cleanItemName = string.lower(string.gsub(itemName, "%s+", ""))
+                        local baseItemName = string.lower(string.gsub(lot.item or "", "%s+", ""))
+                        
                         local isTargeted = (itemName == Config.AuctionTargetItem) or 
                                          (lot.rarity == Config.AuctionAutoRarity) or
                                          (AuctionCache.Seeds[cleanItemName]) or
-                                         (AuctionCache.Gear[cleanItemName])
+                                         (AuctionCache.Gear[cleanItemName]) or
+                                         (AuctionCache.Seeds[baseItemName]) or
+                                         (AuctionCache.Gear[baseItemName])
                         
                         if isTargeted and currentPrice <= Config.AuctionMaxPrice then
                             attemptAuctionPurchase(id, currentPrice)
@@ -1267,6 +1285,91 @@ function ViewCreator.AddSectionHeader(scrollTarget, headerText)
     Label.TextSize = 10
     Label.Font = Enum.Font.GothamBold
     Label.Parent = scrollTarget
+end
+
+function ViewCreator.AddCollapsibleSection(scrollTarget, titleText, isOpenByDefault)
+    local Container = Instance.new("Frame")
+    Container.Size = UDim2.new(1, -8, 0, 42)
+    Container.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+    Container.BorderSizePixel = 0
+    Container.ClipsDescendants = true
+    Container.Parent = scrollTarget
+    
+    local ContainerCorner = Instance.new("UICorner")
+    ContainerCorner.CornerRadius = UDim.new(0, 8)
+    ContainerCorner.Parent = Container
+    
+    local HeaderBtn = Instance.new("TextButton")
+    HeaderBtn.Size = UDim2.new(1, 0, 0, 42)
+    HeaderBtn.BackgroundTransparency = 1
+    HeaderBtn.Text = ""
+    HeaderBtn.Parent = Container
+    
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(0.8, 0, 1, 0)
+    Title.Position = UDim2.new(0, 12, 0, 0)
+    Title.BackgroundTransparency = 1
+    Title.Text = titleText
+    Title.TextColor3 = Color3.fromRGB(230, 230, 235)
+    Title.TextSize = 14
+    Title.Font = Enum.Font.GothamBold
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = HeaderBtn
+    
+    local Arrow = Instance.new("TextLabel")
+    Arrow.Size = UDim2.new(0, 30, 1, 0)
+    Arrow.Position = UDim2.new(1, -40, 0, 0)
+    Arrow.BackgroundTransparency = 1
+    Arrow.Text = isOpenByDefault and "⌵" or "❯"
+    Arrow.TextColor3 = Color3.fromRGB(150, 150, 155)
+    Arrow.TextSize = 16
+    Arrow.Font = Enum.Font.GothamBold
+    Arrow.Parent = HeaderBtn
+    
+    local ContentFrame = Instance.new("Frame")
+    ContentFrame.Size = UDim2.new(1, 0, 0, 0)
+    ContentFrame.Position = UDim2.new(0, 0, 0, 42)
+    ContentFrame.BackgroundTransparency = 1
+    ContentFrame.Parent = Container
+    
+    local ContentLayout = Instance.new("UIListLayout")
+    ContentLayout.Padding = UDim.new(0, 6)
+    ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    ContentLayout.Parent = ContentFrame
+    
+    local ContentPadding = Instance.new("UIPadding")
+    ContentPadding.PaddingLeft = UDim.new(0, 8)
+    ContentPadding.PaddingRight = UDim.new(0, 8)
+    ContentPadding.PaddingBottom = UDim.new(0, 10)
+    ContentPadding.Parent = ContentFrame
+    
+    local isOpen = isOpenByDefault or false
+    local function toggle()
+        isOpen = not isOpen
+        Arrow.Text = isOpen and "⌵" or "❯"
+        
+        if isOpen then
+            Container.Size = UDim2.new(1, -8, 0, 42 + ContentLayout.AbsoluteContentSize.Y + 10)
+        else
+            Container.Size = UDim2.new(1, -8, 0, 42)
+        end
+    end
+    
+    ContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        if isOpen then
+            Container.Size = UDim2.new(1, -8, 0, 42 + ContentLayout.AbsoluteContentSize.Y + 10)
+        end
+    end)
+    
+    HeaderBtn.MouseButton1Click:Connect(toggle)
+    
+    if isOpen then
+        task.defer(function()
+            Container.Size = UDim2.new(1, -8, 0, 42 + ContentLayout.AbsoluteContentSize.Y + 10)
+        end)
+    end
+    
+    return ContentFrame
 end
 
 function ViewCreator.AddToggleCard(scrollTarget, labelText, defaultState, onToggleEvent, registryKey)
@@ -1797,42 +1900,50 @@ end)
 -- ---------------------------------------------------------------------
 -- TAB 2: AUCTION SNIPER ENGINE (NEW V6.3)
 -- ---------------------------------------------------------------------
-ViewCreator.AddSectionHeader(AuctionScroll, "Core Sniper Controls")
+local SniperSection = ViewCreator.AddCollapsibleSection(AuctionScroll, "Shop Auction", true)
 
-ViewCreator.AddToggleCard(AuctionScroll, "🛒 ENABLE AUCTION SNIPER", Config.AuctionSniperEnabled, function(bool)
+ViewCreator.AddToggleCard(SniperSection, "🛒 ENABLE AUCTION SNIPER", Config.AuctionSniperEnabled, function(bool)
     Config.AuctionSniperEnabled = bool
 end, "AuctionSniperEnabled")
 
-ViewCreator.AddInputCard(AuctionScroll, "Maximum Bid Price", tostring(Config.AuctionMaxPrice), function(val)
+ViewCreator.AddInputCard(SniperSection, "Maximum Bid Price", tostring(Config.AuctionMaxPrice), function(val)
     Config.AuctionMaxPrice = tonumber(val) or 1000000
 end, "AuctionMaxPrice")
 
-ViewCreator.AddSectionHeader(AuctionScroll, "Target Selection")
-
-ViewCreator.AddInputCard(AuctionScroll, "Manual Target Name", Config.AuctionTargetItem, function(val)
+ViewCreator.AddInputCard(SniperSection, "Manual Target Name", Config.AuctionTargetItem, function(val)
     Config.AuctionTargetItem = val
 end, "AuctionTargetItem")
 
 local auctionRarityOptions = {"None", "Common", "Uncommon", "Rare", "Legendary", "Mythic", "Super"}
-ViewCreator.AddSingleDropdownCard(AuctionScroll, "Auto-Snipe by Rarity", Config.AuctionAutoRarity, auctionRarityOptions, function(val)
+ViewCreator.AddSingleDropdownCard(SniperSection, "Auto-Snipe by Rarity", Config.AuctionAutoRarity, auctionRarityOptions, function(val)
     Config.AuctionAutoRarity = val
 end, "AuctionAutoRarity")
 
 local seedOptions = {"None", "Acorn", "Apple", "Baby Cactus", "Bamboo", "Banana", "Blueberry", "Briar Rose", "Cactus", "Carrot", "Cherry", "Coconut", "Corn", "Dragon Fruit", "Dragon\'s Breath", "Ghost Pepper", "Glow Mushroom", "Gold", "Grape", "Green Bean", "Horned Melon", "Hypno Bloom", "Mango", "Mega", "Moon Bloom", "Mushroom", "Pineapple", "Poison Apple", "Poison Ivy", "Pomegranate", "Rainbow", "Romanesco", "Strawberry", "Sunflower", "Tomato", "Tulip", "Venom Spitter", "Venus Fly Trap"}
-ViewCreator.AddDropdownCard(AuctionScroll, "Target Seeds (Multi-Select)", Config.AuctionTargetSeeds, seedOptions, function(selectedValue)
+ViewCreator.AddDropdownCard(SniperSection, "Target Seeds (Multi-Select)", Config.AuctionTargetSeeds, seedOptions, function(selectedValue)
     Config.AuctionTargetSeeds = selectedValue
     updateAuctionCache("Seeds", selectedValue)
 end, "AuctionTargetSeeds")
 
 local gearOptions = {"None", "Basic Pot", "Common Sprinkler", "Common Watering Can", "Flashbang", "Gnome", "Invisibility Mushroom", "Jump Mushroom", "Legendary Pet Lure", "Legendary Pet Teleporter", "Legendary Sprinkler", "Megaphone", "Mythic Pet Lure", "Mythic Pet Teleporter", "Player Magnet", "Rare Sprinkler", "Shrink Mushroom", "Sign", "Speed Mushroom", "Strawberry Sniper", "Super Pet Lure", "Super Pet Teleporter", "Super Sprinkler", "Super Watering Can", "Supersize Mushroom", "Teleporter", "Trowel", "Uncommon Sprinkler", "Wheelbarrow"}
-ViewCreator.AddDropdownCard(AuctionScroll, "Target Gear (Multi-Select)", Config.AuctionTargetGear, gearOptions, function(selectedValue)
+ViewCreator.AddDropdownCard(SniperSection, "Target Gear (Multi-Select)", Config.AuctionTargetGear, gearOptions, function(selectedValue)
     Config.AuctionTargetGear = selectedValue
     updateAuctionCache("Gear", selectedValue)
 end, "AuctionTargetGear")
 
-ViewCreator.AddSectionHeader(AuctionScroll, "Placeholders")
-ViewCreator.AddActionCard(AuctionScroll, "Crate Shop Sniper", "Unavailable", function()
+local CrateSection = ViewCreator.AddCollapsibleSection(AuctionScroll, "Shop Crate", false)
+ViewCreator.AddActionCard(CrateSection, "Crate Shop Sniper", "Unavailable", function()
     print("[AUCTION]: Crate shop data is currently unavailable.")
+end)
+
+local GearSection = ViewCreator.AddCollapsibleSection(AuctionScroll, "Shop Gear", false)
+ViewCreator.AddActionCard(GearSection, "Gear Shop Sniper", "Unavailable", function()
+    print("[AUCTION]: This section is currently a placeholder.")
+end)
+
+local SeedSection = ViewCreator.AddCollapsibleSection(AuctionScroll, "Shop Seeds", false)
+ViewCreator.AddActionCard(SeedSection, "Seed Shop Sniper", "Unavailable", function()
+    print("[AUCTION]: This section is currently a placeholder.")
 end)
 
 -- ---------------------------------------------------------------------
