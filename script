@@ -1,5 +1,5 @@
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 6.4 (STABLE MOVEMENT MASTER ENGINE)
+-- PREMIUM UI ENGINE - VERSION 6.4 (RESTABLED & STANDALONE EDITION)
 -- OPTIMIZED & BUG-FIXED RECON EDITION - AUCTIONEER & CMDR INTEGRATED
 -- =====================================================================
 
@@ -115,8 +115,6 @@ local LocalPlayer = Players.LocalPlayer
 local PLACE_ID = game.PlaceId
 
 local Networking = require(ReplicatedStorage.SharedModules.Networking)
-local Auctioneer = require(ReplicatedStorage.SharedModules.Auctioneer)
-local AuctioneerFlags = require(ReplicatedStorage.SharedModules.Flags.AuctioneerFlags)
 
 local FILE_NAME = "PetHunter_PremiumConfig.json"
 local OriginalLightingSettings = {
@@ -167,13 +165,210 @@ local function serverNow()
 end
 
 local AuctioneerMath = {
-    CurrentPrice = function(lot, time)
-        return Auctioneer.CurrentPrice(lot, time or serverNow())
+    CurrentPrice = function(p1, p2)
+        if p1.decrementIntervalSeconds <= 0 then
+            return p1.startPrice
+        end
+        local v1 = p2 - p1.rolledAt
+        if v1 < 0 then v1 = 0 end
+        local v3 = math.floor(v1 / p1.decrementIntervalSeconds)
+        local v6 = p1.startPrice - math.round(p1.startPrice * p1.decrementPercent / 100) * v3
+        if v6 < p1.minPrice then
+            v6 = p1.minPrice
+        end
+        return v6
     end,
-    DisplayName = function(lot)
-        return Auctioneer.DisplayName(lot)
+    DisplayName = function(p1)
+        if p1.displayName ~= nil and p1.displayName ~= "" then
+            return p1.displayName
+        end
+        local t = {}
+        for _, v2 in ipairs({p1.type, p1.size, p1.mutation, p1.item}) do
+            if v2 ~= nil and v2 ~= "" then
+                table.insert(t, v2)
+            end
+        end
+        return table.concat(t, " ")
     end
 }
+
+local lastPurchaseTime = {}
+local function attemptAuctionPurchase(lotId, price, itemName)
+    local purchaseRemote = Networking.Auctioneer.PurchaseLot
+    if purchaseRemote then
+        if lastPurchaseTime[lotId] and (os.clock() - lastPurchaseTime[lotId] < 0.2) then
+            return false, "Debounce"
+        end
+        lastPurchaseTime[lotId] = os.clock()
+        print("[SHOP]: Attempting to Auto-Buy: " .. tostring(itemName) .. " (ID: " .. tostring(lotId) .. ") for " .. tostring(price) .. " coins.")
+        local success, result = pcall(function() 
+            -- Fire the remote with the price parameter as confirmed in controller
+            return purchaseRemote:Fire(lotId, price)
+        end)
+        if success then
+            print("[SHOP]: Purchase request dispatched successfully.")
+        else
+            warn("[SHOP ERROR]: Purchase execution failed: " .. tostring(result))
+        end
+        return success, result
+    end
+    warn("[SHOP ERROR]: Networking.Auctioneer.PurchaseLot not found or accessible!")
+    return false, "Remote not found"
+end
+        
+        if success then
+            print("[SHOP]: Purchase request dispatched successfully.")
+        else
+            warn("[SHOP ERROR]: Purchase execution failed: " .. tostring(result))
+        end
+        return success, result
+    end
+    
+    warn("[SHOP ERROR]: Networking.Auctioneer.PurchaseLot not found or accessible!")
+    return false, "Remote not found"
+end
+
+-- ---------------------------------------------------------------------
+-- CMDR EVENT LISTENER (NEW V6.3)
+-- ---------------------------------------------------------------------
+task.spawn(function()
+    local cmdr = ReplicatedStorage:FindFirstChild("Cmdr")
+    local cmdrEvent = cmdr and cmdr:FindFirstChild("CmdrEvent")
+    if cmdrEvent and cmdrEvent:IsA("RemoteEvent") then
+        cmdrEvent.OnClientEvent:Connect(function(eventName, ...)
+            if Config.CmdrLoggerEnabled then
+                print("[CMDR_LOG]: Event [" .. tostring(eventName) .. "] Data: ", ...)
+            end
+        end)
+    end
+end)
+
+-- Global Teleport Error Handler
+TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
+    if player == LocalPlayer then
+        warn("[ALERT]: Teleport authorization failed: " .. tostring(errorMessage) .. ". Routing emergency fallback hop...")
+        task.wait(1.5)
+        pcall(function()
+            TeleportService:Teleport(PLACE_ID, LocalPlayer)
+        end)
+    end
+end)
+
+local function smoothFlyTo(targetCFrame, speedOverride)
+    local character = LocalPlayer.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart or not Config.PetHuntEnabled then return end
+    
+    if activeTween then pcall(function() activeTween:Cancel() end) end
+    
+    local speed = speedOverride or Config.TweenSpeed
+    local distance = (rootPart.Position - targetCFrame.Position).Magnitude
+    local duration = distance / speed
+    
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+    local flight = TweenService:Create(rootPart, tweenInfo, {CFrame = targetCFrame})
+    
+    activeTween = flight
+    flight:Play()
+    flight.Completed:Wait()
+    activeTween = nil
+end
+
+local function executeDualActionStrike(shovel)
+    local camera = workspace.CurrentCamera
+    if camera then
+        local safeX = 20
+        local safeY = 220 
+        VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 0)
+        VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 0)
+    end
+    
+    if shovel then
+        shovel:Activate() 
+        for _, obj in ipairs(shovel:GetDescendants()) do
+            if obj:IsA("RemoteEvent") or obj:IsA("UnreliableRemoteEvent") then
+                obj:FireServer() 
+                obj:FireServer() 
+            end
+        end
+    end
+end
+
+local function executeInterceptionManeuver(thiefRoot, petRoot)
+    local character = LocalPlayer.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not rootPart or not humanoid or not Config.PetHuntEnabled then return end
+    
+    print("[TACTICAL]: Thief detected! Overriding velocity matrix to Max Combat Speed.")
+    
+    local shovel = character:FindFirstChild("Shovel") or LocalPlayer.Backpack:FindFirstChild("Shovel")
+    if shovel and shovel.Parent == LocalPlayer.Backpack then
+        humanoid:EquipTool(shovel)
+        task.wait(0.02) 
+    end
+    
+    local strikePosition = thiefRoot.CFrame * CFrame.new(0, 0, 1.2)
+    smoothFlyTo(strikePosition, Config.CombatDashSpeed)
+    
+    if shovel and Config.PetHuntEnabled then
+        for i = 1, 10 do
+            executeDualActionStrike(shovel)
+            task.wait() 
+        end
+    end
+    
+    if Config.PetHuntEnabled then
+        local returnPosition = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
+        smoothFlyTo(returnPosition, Config.CombatDashSpeed)
+    end
+end
+
+local function deployPurchaseInterception(activeTarget, rootPart)
+    if not fireproximityprompt then return end
+    
+    if activeTarget then
+        for _, obj in ipairs(activeTarget:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                fireproximityprompt(obj)
+            end
+        end
+    end
+    
+    local gardens = workspace:FindFirstChild("Gardens")
+    if gardens then
+        for _, obj in ipairs(gardens:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                if obj:FindFirstAncestor("Signs") or string.find(obj.Name:lower(), "mailbox") or string.find(obj.Name:lower(), "sign") then
+                    continue 
+                end
+                
+                local parentPart = obj.Parent
+                if parentPart and parentPart:IsA("BasePart") then
+                    local distance = (parentPart.Position - rootPart.Position).Magnitude
+                    if distance <= 20 then
+                        fireproximityprompt(obj)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- ---------------------------------------------------------------------
+-- DEDICATED PET FINDER: PUBLIC ROOM ROTATION ENGINE
+-- ---------------------------------------------------------------------
+local function rotateServerInstance()
+    print("[PET_FINDER]: Transitioning room states. Sifting global server index arrays...")
+    
+    local apiURL = string.format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100", tostring(PLACE_ID))
+    local fetchSuccess, serverData = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(apiURL))
+    end)
+    
+    if fetchSuccess and serverData and serverData.data then
+        local serverList = serverData.data
+        local priorityServers = {}
         local backupServers = {}
         
         for _, server in pairs(serverList) do
