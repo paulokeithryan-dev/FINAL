@@ -152,38 +152,55 @@ local lastPurchaseTime = 0
 local PURCHASE_COOLDOWN = 10.1 -- Based on AuctioneerFlags (10s + small buffer)
 
 local AuctioneerMath = {
-    CurrentPrice = function(lot, now)
-        if lot.decrementIntervalSeconds <= 0 then return lot.startPrice end
-        local elapsed = math.max(0, now - lot.rolledAt)
-        local ticks = math.floor(elapsed / lot.decrementIntervalSeconds)
-        local decAmt = math.round(lot.startPrice * lot.decrementPercent / 100)
-        return math.max(lot.minPrice, lot.startPrice - (math.round(decAmt) * ticks))
-    end,
-    DisplayName = function(lot)
-        if lot.displayName and lot.displayName ~= "" then return lot.displayName end
-        local components = {}
-        for _, val in ipairs({lot.type, lot.size, lot.mutation, lot.item}) do
-            if val and val ~= "" then table.insert(components, val) end
+    CurrentPrice = function(p1, p2)
+        if p1.decrementIntervalSeconds <= 0 then
+            return p1.startPrice
         end
-        return #components > 0 and table.concat(components, " ") or "Unknown Item"
+        local v1 = p2 - p1.rolledAt
+        if v1 < 0 then v1 = 0 end
+        local v3 = math.floor(v1 / p1.decrementIntervalSeconds)
+        local v6 = p1.startPrice - math.round(p1.startPrice * p1.decrementPercent / 100) * v3
+        if v6 < p1.minPrice then
+            v6 = p1.minPrice
+        end
+        return v6
+    end,
+    DisplayName = function(p1)
+        if p1.displayName ~= nil and p1.displayName ~= "" then
+            return p1.displayName
+        end
+        local t = {}
+        for _, v2 in ipairs({p1.type, p1.size, p1.mutation, p1.item}) do
+            if v2 ~= nil and v2 ~= "" then
+                table.insert(t, v2)
+            end
+        end
+        return table.concat(t, " ")
     end
 }
 
-local function attemptAuctionPurchase(lotId, price)
+local function attemptAuctionPurchase(lotId, price, itemName)
     if os.clock() - lastPurchaseTime < PURCHASE_COOLDOWN then return false, "Cooldown" end
     
     local network = ReplicatedStorage:FindFirstChild("Network")
     if network then
-        local purchaseRemote = network:FindFirstChild("AuctioneerPurchaseLot")
+        -- Try official name first, then fallback
+        local purchaseRemote = network:FindFirstChild("Auctioneer.PurchaseLot") or network:FindFirstChild("AuctioneerPurchaseLot")
         if purchaseRemote and purchaseRemote:IsA("RemoteFunction") then
-            print("[SNIPER]: Firing purchase signal for Lot: " .. tostring(lotId) .. " at Price: " .. tostring(price))
+            print("[SHOP]: Attempting to Auto-Buy: " .. tostring(itemName) .. " for " .. tostring(price) .. " coins.")
             lastPurchaseTime = os.clock()
             local success, result = pcall(function()
                 return purchaseRemote:InvokeServer(lotId, price)
             end)
+            if success then
+                print("[SHOP]: Purchase request sent successfully.")
+            else
+                print("[SHOP]: Purchase failed: " .. tostring(result))
+            end
             return success, result
         end
     end
+    warn("[SHOP ERROR]: Purchase remote not found in ReplicatedStorage.Network!")
     return false, "Remote not found"
 end
 
@@ -825,7 +842,7 @@ task.spawn(function()
         if Config.AutoBuyAuction and (os.clock() - lastAuctionCheck > 0.5) then
             lastAuctionCheck = os.clock()
             local network = ReplicatedStorage:FindFirstChild("Network")
-            local requestSnapshot = network and network:FindFirstChild("AuctioneerRequestSnapshot")
+            local requestSnapshot = network and (network:FindFirstChild("Auctioneer.RequestSnapshot") or network:FindFirstChild("AuctioneerRequestSnapshot"))
             if requestSnapshot then
                 local success, snapshot = pcall(function() return requestSnapshot:InvokeServer() end)
                 if success and snapshot and snapshot.lots then
@@ -851,11 +868,13 @@ task.spawn(function()
                             end
                             
                             if priceCondition then
-                                attemptAuctionPurchase(id, currentPrice)
+                                attemptAuctionPurchase(id, currentPrice, itemName)
                             end
                         end
                     end
                 end
+            else
+                warn("[SHOP ERROR]: Auction snapshot remote not found!")
             end
         end
         
