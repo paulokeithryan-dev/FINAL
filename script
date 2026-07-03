@@ -179,28 +179,79 @@ local AuctioneerMath = {
     end
 }
 
+local function findRemote(remoteName)
+    -- 1. Search in RemoteEvents folder (priority based on user code)
+    local remoteEvents = ReplicatedStorage:FindFirstChild("RemoteEvents")
+    if remoteEvents then
+        local found = remoteEvents:FindFirstChild(remoteName)
+        if found then return found end
+        
+        -- Handle dotted names (e.g., Auctioneer.PurchaseLot)
+        local parts = string.split(remoteName, ".")
+        if #parts > 1 then
+            local current = remoteEvents
+            for _, part in ipairs(parts) do
+                current = current:FindFirstChild(part)
+                if not current then break end
+            end
+            if current then return current end
+        end
+    end
+    
+    -- 2. Search in Network folder
+    local network = ReplicatedStorage:FindFirstChild("Network")
+    if network then
+        local found = network:FindFirstChild(remoteName)
+        if found then return found end
+        
+        -- Handle dotted names
+        local parts = string.split(remoteName, ".")
+        if #parts > 1 then
+            local current = network
+            for _, part in ipairs(parts) do
+                current = current:FindFirstChild(part)
+                if not current then break end
+            end
+            if current then return current end
+        end
+    end
+    
+    -- 3. Global Recursive Search (Fallback)
+    for _, descendant in ipairs(ReplicatedStorage:GetDescendants()) do
+        if descendant.Name == remoteName or (descendant:IsA("RemoteFunction") or descendant:IsA("RemoteEvent")) and descendant.Name:find(remoteName) then
+            return descendant
+        end
+    end
+    
+    return nil
+end
+
 local function attemptAuctionPurchase(lotId, price, itemName)
     if os.clock() - lastPurchaseTime < PURCHASE_COOLDOWN then return false, "Cooldown" end
     
-    local network = ReplicatedStorage:FindFirstChild("Network")
-    if network then
-        -- Try official name first, then fallback
-        local purchaseRemote = network:FindFirstChild("Auctioneer.PurchaseLot") or network:FindFirstChild("AuctioneerPurchaseLot")
-        if purchaseRemote and purchaseRemote:IsA("RemoteFunction") then
-            print("[SHOP]: Attempting to Auto-Buy: " .. tostring(itemName) .. " for " .. tostring(price) .. " coins.")
-            lastPurchaseTime = os.clock()
-            local success, result = pcall(function()
-                return purchaseRemote:InvokeServer(lotId, price)
-            end)
-            if success then
-                print("[SHOP]: Purchase request sent successfully.")
-            else
-                print("[SHOP]: Purchase failed: " .. tostring(result))
-            end
-            return success, result
+    local purchaseRemote = findRemote("Auctioneer.PurchaseLot") or findRemote("AuctioneerPurchaseLot")
+    
+    if purchaseRemote then
+        print("[SHOP]: Attempting to Auto-Buy: " .. tostring(itemName) .. " for " .. tostring(price) .. " coins.")
+        lastPurchaseTime = os.clock()
+        
+        local success, result
+        if purchaseRemote:IsA("RemoteFunction") then
+            success, result = pcall(function() return purchaseRemote:InvokeServer(lotId, price) end)
+        elseif purchaseRemote:IsA("RemoteEvent") then
+            success = pcall(function() purchaseRemote:FireServer(lotId, price) end)
+            result = "Event Fired"
         end
+        
+        if success then
+            print("[SHOP]: Purchase request sent successfully.")
+        else
+            print("[SHOP]: Purchase failed: " .. tostring(result))
+        end
+        return success, result
     end
-    warn("[SHOP ERROR]: Purchase remote not found in ReplicatedStorage.Network!")
+    
+    warn("[SHOP ERROR]: Purchase remote not found anywhere in ReplicatedStorage!")
     return false, "Remote not found"
 end
 
@@ -841,9 +892,9 @@ task.spawn(function()
 
         if Config.AutoBuyAuction and (os.clock() - lastAuctionCheck > 0.5) then
             lastAuctionCheck = os.clock()
-            local network = ReplicatedStorage:FindFirstChild("Network")
-            local requestSnapshot = network and (network:FindFirstChild("Auctioneer.RequestSnapshot") or network:FindFirstChild("AuctioneerRequestSnapshot"))
-            if requestSnapshot then
+            local requestSnapshot = findRemote("Auctioneer.RequestSnapshot") or findRemote("AuctioneerRequestSnapshot")
+            
+            if requestSnapshot and requestSnapshot:IsA("RemoteFunction") then
                 local success, snapshot = pcall(function() return requestSnapshot:InvokeServer() end)
                 if success and snapshot and snapshot.lots then
                     for id, lot in pairs(snapshot.lots) do
@@ -874,7 +925,7 @@ task.spawn(function()
                     end
                 end
             else
-                warn("[SHOP ERROR]: Auction snapshot remote not found!")
+                warn("[SHOP ERROR]: Auction snapshot remote not found in ReplicatedStorage!")
             end
         end
         
