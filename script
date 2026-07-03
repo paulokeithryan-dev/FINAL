@@ -198,16 +198,8 @@ local function attemptAuctionPurchase(lotId, price, itemName)
         print("[SHOP]: Attempting to Auto-Buy: " .. tostring(itemName) .. " (ID: " .. tostring(lotId) .. ") for " .. tostring(price) .. " coins.")
         
         local success, result = pcall(function() 
-            if purchaseRemote:IsA("RemoteEvent") then
-                purchaseRemote:FireServer(lotId, price)
-            elseif purchaseRemote:IsA("UnreliableRemoteEvent") then
-                purchaseRemote:FireServer(lotId, price)
-            elseif purchaseRemote:IsA("RemoteFunction") then
-                return purchaseRemote:InvokeServer(lotId, price)
-            else
-                -- Fallback to Fire if it's a custom wrapper
-                return purchaseRemote:Fire(lotId, price)
-            end
+            -- Using the game's native Fire method confirmed in AuctioneerController
+            return purchaseRemote:Fire(lotId, price)
         end)
         
         if success then
@@ -863,14 +855,13 @@ task.spawn(function()
             
             if requestSnapshot then
                 local success, snapshot = pcall(function() 
-                    if requestSnapshot:IsA("RemoteFunction") then
-                        return requestSnapshot:InvokeServer()
-                    else
-                        return requestSnapshot:Fire()
-                    end
+                    return requestSnapshot:Fire()
                 end)
                 
                 if success and snapshot and snapshot.manifest and snapshot.manifest.lots then
+                    if Config.CmdrLoggerEnabled then
+                        print("[AUCTION]: Snapshot received, scanning " .. #snapshot.manifest.lots .. " lots...")
+                    end
                     for _, lot in pairs(snapshot.manifest.lots) do
                         local lotId = lot.lotId
                         if not lotId then continue end
