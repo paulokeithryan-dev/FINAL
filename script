@@ -1,6 +1,5 @@
-print("[BOOT]: Script execution initiated. Initializing environment...")
 -- =====================================================================
--- PREMIUM UI ENGINE - VERSION 6.4 (STABLE & DEBUG EDITION)
+-- PREMIUM UI ENGINE - VERSION 6.4 (LITE & CORE EDITION)
 -- OPTIMIZED & BUG-FIXED RECON EDITION - AUCTIONEER & CMDR INTEGRATED
 -- =====================================================================
 
@@ -113,7 +112,6 @@ local PathfindingService = game:GetService("PathfindingService")
 local TeleportService = game:GetService("TeleportService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
-print("[BOOT]: Service hooks and LocalPlayer established.")
 local PLACE_ID = game.PlaceId
 
 local Networking = require(ReplicatedStorage.SharedModules.Networking)
@@ -202,23 +200,16 @@ local function attemptAuctionPurchase(lotId, price, itemName)
             return false, "Debounce"
         end
         lastPurchaseTime[lotId] = os.clock()
-        print("[SHOP]: Attempting to Auto-Buy: " .. tostring(itemName) .. " (ID: " .. tostring(lotId) .. ") for " .. tostring(price) .. " coins.")
         local success, result = pcall(function() 
             return purchaseRemote:Fire(lotId, price)
         end)
-        if success then
-            print("[SHOP]: Purchase request dispatched successfully.")
-        else
-            warn("[SHOP ERROR]: Purchase execution failed: " .. tostring(result))
-        end
         return success, result
     end
-    warn("[SHOP ERROR]: Networking.Auctioneer.PurchaseLot not found or accessible!")
     return false, "Remote not found"
 end
         
         if success then
-            print("[SHOP]: Purchase request dispatched successfully.")
+--             print("[SHOP]: Purchase request dispatched successfully.")
         else
             warn("[SHOP ERROR]: Purchase execution failed: " .. tostring(result))
         end
@@ -238,7 +229,7 @@ task.spawn(function()
     if cmdrEvent and cmdrEvent:IsA("RemoteEvent") then
         cmdrEvent.OnClientEvent:Connect(function(eventName, ...)
             if Config.CmdrLoggerEnabled then
-                print("[CMDR_LOG]: Event [" .. tostring(eventName) .. "] Data: ", ...)
+--                 print("[CMDR_LOG]: Event [" .. tostring(eventName) .. "] Data: ", ...)
             end
         end)
     end
@@ -301,7 +292,7 @@ local function executeInterceptionManeuver(thiefRoot, petRoot)
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     if not rootPart or not humanoid or not Config.PetHuntEnabled then return end
     
-    print("[TACTICAL]: Thief detected! Overriding velocity matrix to Max Combat Speed.")
+--     print("[TACTICAL]: Thief detected! Overriding velocity matrix to Max Combat Speed.")
     
     local shovel = character:FindFirstChild("Shovel") or LocalPlayer.Backpack:FindFirstChild("Shovel")
     if shovel and shovel.Parent == LocalPlayer.Backpack then
@@ -360,7 +351,7 @@ end
 -- DEDICATED PET FINDER: PUBLIC ROOM ROTATION ENGINE
 -- ---------------------------------------------------------------------
 local function rotateServerInstance()
-    print("[PET_FINDER]: Transitioning room states. Sifting global server index arrays...")
+--     print("[PET_FINDER]: Transitioning room states. Sifting global server index arrays...")
     
     local apiURL = string.format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100", tostring(PLACE_ID))
     local fetchSuccess, serverData = pcall(function()
@@ -389,7 +380,7 @@ local function rotateServerInstance()
         end
         
         for _, server in pairs(priorityServers) do
-            print(string.format("[PET_FINDER]: Targeting sniper paradise instance (%d players) ID: %s", server.playing, tostring(server.id)))
+--             print(string.format("[PET_FINDER]: Targeting sniper paradise instance (%d players) ID: %s", server.playing, tostring(server.id)))
             task.wait(0.5)
             local teleportSuccess, teleportErr = pcall(function()
                 TeleportService:TeleportToPlaceInstance(PLACE_ID, server.id, LocalPlayer)
@@ -397,7 +388,7 @@ local function rotateServerInstance()
             if teleportSuccess then return end
         end
         
-        print("[PET_FINDER]: No immediate low-player targets available. Shifting to backup index array...")
+--         print("[PET_FINDER]: No immediate low-player targets available. Shifting to backup index array...")
         for i = #backupServers, 2, -1 do
             local j = math.random(i)
             backupServers[i], backupServers[j] = backupServers[j], backupServers[i]
@@ -412,7 +403,7 @@ local function rotateServerInstance()
         end
     end
     
-    print("[PET_FINDER]: Public query directory exhausted. Deploying baseline safety hop...")
+--     print("[PET_FINDER]: Public query directory exhausted. Deploying baseline safety hop...")
     pcall(function()
         TeleportService:Teleport(PLACE_ID, LocalPlayer)
     end)
@@ -428,7 +419,7 @@ local function saveConfig()
     
     if success and writefile then
         writefile(FILE_NAME, encoded)
-        print("[CONFIG]: Data safely written to local storage matrix.")
+--         print("[CONFIG]: Data safely written to local storage matrix.")
     else
         warn("[CONFIG]: Local execution hardware blocked data serialization write sequence.")
     end
@@ -483,7 +474,7 @@ local function loadConfig()
             updateAuctionCache("Packs", Config.AuctionTargetPacks)
             updateAuctionCache("Eggs", Config.AuctionTargetEggs)
             
-            print("[CONFIG]: Setup configuration loaded and applied successfully.")
+--             print("[CONFIG]: Setup configuration loaded and applied successfully.")
         end
     end
 end
@@ -883,7 +874,7 @@ task.spawn(function()
                 
                 if success and snapshot and snapshot.manifest and snapshot.manifest.lots then
                     if Config.CmdrLoggerEnabled then
-                        print("[AUCTION]: Snapshot received, scanning " .. #snapshot.manifest.lots .. " lots...")
+--                         print("[AUCTION]: Snapshot received, scanning " .. #snapshot.manifest.lots .. " lots...")
                     end
                     for _, lot in pairs(snapshot.manifest.lots) do
                         local lotId = lot.lotId
@@ -904,7 +895,7 @@ task.spawn(function()
                         
                         -- DIAGNOSTIC LOGGING
                         if Config.CmdrLoggerEnabled then
-                            print(string.format("[AUCTION SCAN]: Found: %s | Base: %s | Target: %s", itemName, lot.item or "N/A", tostring(isTargeted)))
+--                             print(string.format("[AUCTION SCAN]: Found: %s | Base: %s | Target: %s", itemName, lot.item or "N/A", tostring(isTargeted)))
                         end
                         
                         if isTargeted then
@@ -958,7 +949,7 @@ task.spawn(function()
                 if activeTarget then
                     local petRoot = activeTarget.RootPart
                     local petName = activeTarget:GetAttribute("PetName") or activeTarget.Name
-                    print("[HUNTER]: Safe navigation tracking locked onto " .. tostring(petName))
+--                     print("[HUNTER]: Safe navigation tracking locked onto " .. tostring(petName))
                     
                     local shovel = character:FindFirstChild("Shovel") or LocalPlayer.Backpack:FindFirstChild("Shovel")
                     if shovel and shovel.Parent == LocalPlayer.Backpack then
@@ -1051,16 +1042,16 @@ task.spawn(function()
                     end
                     
                     deployPurchaseInterception(nil, rootPart)
-                    print("[HUNTER]: Target tracking concluded.")
+--                     print("[HUNTER]: Target tracking concluded.")
                     
                     if capturedSuccessfully and Config.ServerHopEnabled then
-                        print("[HUNTER]: Capture lifecycle complete. Transitioning room state...")
+--                         print("[HUNTER]: Capture lifecycle complete. Transitioning room state...")
                         isProcessingHopLifecycle = true
                         task.wait(1.5)
                         rotateServerInstance()
                     end
                 elseif Config.ServerHopEnabled then
-                    print("[HUNTER]: No targets in current instance. Rotating server...")
+--                     print("[HUNTER]: No targets in current instance. Rotating server...")
                     isProcessingHopLifecycle = true
                     rotateServerInstance()
                 end
@@ -1988,7 +1979,7 @@ end)
 -- ---------------------------------------------------------------------
 local CrateSection = ViewCreator.AddCollapsibleSection(ShopScroll, "Shop Crate", false)
 ViewCreator.AddActionCard(CrateSection, "Crate Shop Automation", "Unavailable", function()
-    print("[SHOP]: Crate shop automation is currently unavailable.")
+--     print("[SHOP]: Crate shop automation is currently unavailable.")
 end)
 
 local AuctionSection = ViewCreator.AddCollapsibleSection(ShopScroll, "Shop Auction", true)
@@ -2032,12 +2023,12 @@ end, "AutoBuyAuction")
 
 local GearShopSection = ViewCreator.AddCollapsibleSection(ShopScroll, "Shop Gear", false)
 ViewCreator.AddActionCard(GearShopSection, "Gear Shop Automation", "Unavailable", function()
-    print("[SHOP]: This section is currently a placeholder.")
+--     print("[SHOP]: This section is currently a placeholder.")
 end)
 
 local SeedShopSection = ViewCreator.AddCollapsibleSection(ShopScroll, "Shop Seeds", false)
 ViewCreator.AddActionCard(SeedShopSection, "Seed Shop Automation", "Unavailable", function()
-    print("[SHOP]: This section is currently a placeholder.")
+--     print("[SHOP]: This section is currently a placeholder.")
 end)
 
 -- ---------------------------------------------------------------------
@@ -2057,7 +2048,7 @@ ViewCreator.AddSectionHeader(MiscScroll, "Map Controls")
 
 ViewCreator.AddActionCard(MiscScroll, "Remove Other Gardens", "Clean", function()
     removeOtherGardensInstantly()
-    print("[OPTIMIZATION]: Executed instant targeted memory purge.")
+--     print("[OPTIMIZATION]: Executed instant targeted memory purge.")
 end)
 
 ViewCreator.AddToggleCard(MiscScroll, "Auto Remove Other Gardens (Loop)", Config.AutoRemoveOtherGardens, function(bool)
@@ -2067,7 +2058,7 @@ end, "AutoRemoveOtherGardens")
 
 ViewCreator.AddActionCard(MiscScroll, "Reduce Lag (Clear Assets)", "Optimize", function()
     applyAggressiveLagReduction()
-    print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
+--     print("[OPTIMIZATION]: 3D Lighting, Materials, and Textures aggressively optimized.")
 end)
 
 ViewCreator.AddToggleCard(MiscScroll, "Auto Reduce Lag (Loop)", Config.AutoReduceLag, function(bool)
@@ -2150,7 +2141,7 @@ ViewCreator.AddSectionHeader(SettingsScroll, "Movement Control Parameters")
 local teleportModes = {"Tween", "Walk", "Teleport"}
 ViewCreator.AddSingleDropdownCard(SettingsScroll, "Teleport Mode", Config.TeleportMode, teleportModes, function(selectedMode)
     Config.TeleportMode = selectedMode
-    print("[ENGINE]: Velocity mechanics shifted to mode -> " .. tostring(selectedMode))
+--     print("[ENGINE]: Velocity mechanics shifted to mode -> " .. tostring(selectedMode))
 end, "TeleportMode")
 
 -- EXPOSED MISSING MOVEMENTパラメータ CONTROL CARDS
