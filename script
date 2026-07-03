@@ -79,10 +79,12 @@ local AuctionCache = { Seeds = {}, Gear = {}, Packs = {}, Eggs = {} }
 local function updateAuctionCache(cacheType, commaStr)
     AuctionCache[cacheType] = {}
     if commaStr and commaStr ~= "None" and commaStr ~= "Select Options" and commaStr ~= "" then
-        for token in string.gmatch(commaStr, "[^,%s]+") do
-            local cleanToken = string.lower(string.gsub(token, "%s+", ""))
-            AuctionCache[cacheType][cleanToken] = true
-        end
+            for token in string.gmatch(commaStr, "[^,]+") do
+                local cleanToken = string.lower(string.gsub(token, "[%s%p]+", ""))
+                if cleanToken ~= "" then
+                    AuctionCache[cacheType][cleanToken] = true
+                end
+            end
     end
 end
 local function updateESPCache(cacheType, commaStr)
@@ -844,23 +846,29 @@ task.spawn(function()
             if joinRemote then pcall(function() joinRemote:InvokeServer("Public") end) end
         end
 
-        if Config.AutoBuyAuction and (os.clock() - lastAuctionCheck > 0.5) then
+        if Config.AutoBuyAuction and (os.clock() - lastAuctionCheck > 0.4) then
             lastAuctionCheck = os.clock()
             local requestSnapshot = Networking.Auctioneer.RequestSnapshot
             
             if requestSnapshot then
                 local success, snapshot = pcall(function() return requestSnapshot:Fire() end)
                 if success and snapshot and snapshot.manifest and snapshot.manifest.lots then
-                    for id, lot in pairs(snapshot.manifest.lots) do
+                    for _, lot in pairs(snapshot.manifest.lots) do
+                        local lotId = lot.lotId
+                        if not lotId then continue end
+                        
                         local currentPrice = AuctioneerMath.CurrentPrice(lot, serverNow())
                         local itemName = AuctioneerMath.DisplayName(lot)
-                        local cleanItemName = string.lower(string.gsub(itemName, "%s+", ""))
-                        local baseItemName = string.lower(string.gsub(lot.item or "", "%s+", ""))
+                        local cleanItemName = string.lower(string.gsub(itemName, "[%s%p]+", ""))
+                        local baseItemName = string.lower(string.gsub(lot.item or "", "[%s%p]+", ""))
                         
-                        local isTargeted = (AuctionCache.Seeds[cleanItemName] or AuctionCache.Seeds[baseItemName]) or
-                                         (AuctionCache.Gear[cleanItemName] or AuctionCache.Gear[baseItemName]) or
-                                         (AuctionCache.Packs[cleanItemName] or AuctionCache.Packs[baseItemName]) or
-                                         (AuctionCache.Eggs[cleanItemName] or AuctionCache.Eggs[baseItemName])
+                        local isTargeted = false
+                        for _, cache in pairs(AuctionCache) do
+                            if cache[cleanItemName] or cache[baseItemName] then
+                                isTargeted = true
+                                break
+                            end
+                        end
                         
                         if isTargeted then
                             local priceCondition = false
@@ -873,7 +881,7 @@ task.spawn(function()
                             end
                             
                             if priceCondition then
-                                attemptAuctionPurchase(id, currentPrice, itemName)
+                                attemptAuctionPurchase(lotId, currentPrice, itemName)
                             end
                         end
                     end
@@ -1668,10 +1676,10 @@ function ViewCreator.AddDropdownCard(scrollTarget, labelText, defaultText, optio
         local finalString = ""
         if count == 0 then
             finalString = "Select Options"
-            DropdownBtn.Text = finalString
+            DropdownBtn.Text = "Select Options"
         elseif count == 1 then
             finalString = names[1]
-            DropdownBtn.Text = finalString
+            DropdownBtn.Text = names[1]
         else
             finalString = table.concat(names, ", ")
             DropdownBtn.Text = count .. " Selected"
@@ -1940,25 +1948,25 @@ end)
 
 local AuctionSection = ViewCreator.AddCollapsibleSection(ShopScroll, "Shop Auction", true)
 
-local seedOptions = {"None", "Acorn", "Apple", "Baby Cactus", "Bamboo", "Banana", "Blueberry", "Briar Rose", "Cactus", "Carrot", "Cherry", "Coconut", "Corn", "Dragon Fruit", "Dragon\'s Breath", "Ghost Pepper", "Glow Mushroom", "Gold", "Grape", "Green Bean", "Horned Melon", "Hypno Bloom", "Mango", "Mega", "Moon Bloom", "Mushroom", "Pineapple", "Poison Apple", "Poison Ivy", "Pomegranate", "Rainbow", "Romanesco", "Strawberry", "Sunflower", "Tomato", "Tulip", "Venom Spitter", "Venus Fly Trap"}
+local seedOptions = {"None", "Acorn", "Apple", "Baby Cactus", "Bamboo", "Banana", "Blueberry", "Briar Rose", "Cactus", "Carrot", "Cherry", "Coconut", "Corn", "Dragon Fruit", "Dragon\'s Breath", "Fire Fern", "Ghost Pepper", "Glow Mushroom", "Gold", "Grape", "Green Bean", "Horned Melon", "Hypno Bloom", "Mango", "Mega", "Moon Bloom", "Mushroom", "Pineapple", "Poison Apple", "Poison Ivy", "Pomegranate", "Rainbow", "Romanesco", "Strawberry", "Sunflower", "Tomato", "Tulip", "Venom Spitter", "Venus Fly Trap"}
 ViewCreator.AddDropdownCard(AuctionSection, "Select Seed", Config.AuctionTargetSeeds, seedOptions, function(selectedValue)
     Config.AuctionTargetSeeds = selectedValue
     updateAuctionCache("Seeds", selectedValue)
 end, "AuctionTargetSeeds")
 
-local gearOptions = {"None", "Basic Pot", "Common Sprinkler", "Common Watering Can", "Flashbang", "Gnome", "Invisibility Mushroom", "Jump Mushroom", "Legendary Pet Lure", "Legendary Pet Teleporter", "Legendary Sprinkler", "Megaphone", "Mythic Pet Lure", "Mythic Pet Teleporter", "Player Magnet", "Rare Sprinkler", "Shrink Mushroom", "Sign", "Speed Mushroom", "Strawberry Sniper", "Super Pet Lure", "Super Pet Teleporter", "Super Sprinkler", "Super Watering Can", "Supersize Mushroom", "Teleporter", "Trowel", "Uncommon Sprinkler", "Wheelbarrow"}
+local gearOptions = {"None", "Basic Pot", "Common Sprinkler", "Common Watering Can", "Flashbang", "Gnome", "Invisibility Mushroom", "Jump Mushroom", "Legendary Pet Teleporter", "Legendary Sprinkler", "Megaphone", "Mythic Pet Teleporter", "Player Magnet", "Rare Sprinkler", "Shrink Mushroom", "Sign", "Speed Mushroom", "Strawberry Sniper", "Super Pet Teleporter", "Super Sprinkler", "Super Watering Can", "Supersize Mushroom", "Teleporter", "Trowel", "Uncommon Sprinkler", "Wheelbarrow"}
 ViewCreator.AddDropdownCard(AuctionSection, "Select Gear", Config.AuctionTargetGear, gearOptions, function(selectedValue)
     Config.AuctionTargetGear = selectedValue
     updateAuctionCache("Gear", selectedValue)
 end, "AuctionTargetGear")
 
-local packOptions = {"None", "Seed Pack", "Rare Seed Pack", "Epic Seed Pack", "Legendary Seed Pack", "Mythic Seed Pack", "Super Seed Pack"}
+local packOptions = {"None", "Common Seed Pack", "Uncommon Seed Pack", "Rare Seed Pack", "Mythic Seed Pack", "Legendary Seed Pack", "Super Seed Pack", "Secret Seed Pack", "Ghost Pepper Pack"}
 ViewCreator.AddDropdownCard(AuctionSection, "Select Seed Pack", Config.AuctionTargetPacks, packOptions, function(selectedValue)
     Config.AuctionTargetPacks = selectedValue
     updateAuctionCache("Packs", selectedValue)
 end, "AuctionTargetPacks")
 
-local eggOptions = {"None", "Common Egg", "Uncommon Egg", "Rare Egg", "Epic Egg", "Legendary Egg", "Mythic Egg", "Super Egg"}
+local eggOptions = {"None", "Common Egg", "Test Egg", "Big Egg", "Mega Egg", "Rainbow Egg"}
 ViewCreator.AddDropdownCard(AuctionSection, "Select Egg", Config.AuctionTargetEggs, eggOptions, function(selectedValue)
     Config.AuctionTargetEggs = selectedValue
     updateAuctionCache("Eggs", selectedValue)
