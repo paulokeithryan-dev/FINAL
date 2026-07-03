@@ -311,12 +311,17 @@ local function isMyGarden(garden)
 end
 
 local function removeOtherGardensInstantly()
-    local gardensFolder = workspace:FindFirstChild("Gardens")
-    if gardensFolder then
-        for _, garden in ipairs(gardensFolder:GetChildren()) do
-            if not isMyGarden(garden) then
-                pcall(function() garden:Destroy() end)
-            end
+    local gardens = workspace:FindFirstChild("Gardens")
+    if not gardens then return end
+    for _, garden in ipairs(gardens:GetChildren()) do
+        if garden:GetAttribute("Owner") ~= LocalPlayer.UserId then
+            -- SAFE: Move to a hidden folder instead of Destroying
+            local hidden = workspace:FindFirstChild("HiddenGardens") or Instance.new("Folder", workspace)
+            hidden.Name = "HiddenGardens"
+            garden.Parent = hidden
+        end
+    end
+end
         end
     end
 end
@@ -325,16 +330,20 @@ local function applyAggressiveLagReduction()
     pcall(function()
         Lighting.GlobalShadows = false
         Lighting.FogEnd = 9e9
-        Lighting.EnvironmentBlurIntensity = 0
-        Lighting.EnvironmentDiffuseScale = 0
-        Lighting.EnvironmentSpecularScale = 0
     end)
-    
-    for _, obj in ipairs(Lighting:GetChildren()) do
+    for _, instance in ipairs(workspace:GetDescendants()) do
         pcall(function()
-            if obj:IsA("PostEffect") or obj:IsA("Atmosphere") or obj:IsA("Sky") or obj:IsA("Clouds") then
-                obj:Destroy()
+            if instance:IsA("ParticleEmitter") or instance:IsA("Smoke") or instance:IsA("Sparkles") or instance:IsA("Fire") then
+                instance.Enabled = false
+            elseif instance:IsA("Decal") or instance:IsA("Texture") then
+                instance.Transparency = 1 -- SAFE: Hide instead of Destroy
+            elseif instance:IsA("BasePart") then
+                instance.CastShadow = false
+                instance.Material = Enum.Material.SmoothPlastic
             end
+        end)
+    end
+end
         end)
     end
     
