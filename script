@@ -1,777 +1,1423 @@
 -- =====================================================================
---           GARDEN TYCOON — ADVANCED CONTROL SUITE v11.0 MASTER
---   OPTIMIZED CODEBASE • FULL GAME CORE INTEGRATION • ZERO TRUNCATION
+-- PREMIUM UI ENGINE - VERSION 6.2 (STABLE MOVEMENT MASTER ENGINE)
+-- OMNI-RECON EDITION: FULL SYSTEM REBUILD & EXPANSION
+-- FEATURES: ADVANCED UI, PACKET NETWORKING, SHOP SIDEBAR, & TELEMETRY
 -- =====================================================================
 
-local function MainControlSuite()
-    -- ============================================================
-    -- SECTION 1: GLOBAL SERVICES & ARCHITECTURE INITIALIZATION
-    -- ============================================================
-    local Players = game:GetService("Players")
-    local Workspace = game:GetService("Workspace")
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local TweenService = game:GetService("TweenService")
-    local RunService = game:GetService("RunService")
-    local CoreGui = game:GetService("CoreGui")
-    local HttpService = game:GetService("HttpService")
-    local PathfindingService = game:GetService("PathfindingService")
-    local UserInputService = game:GetService("UserInputService")
-    local SoundService = game:GetService("SoundService")
+-- This script represents a complete architectural overhaul, integrating 
+-- multiple sub-systems (Weather, Time, Networking, UI, ESP, Automation) 
+-- into a unified, high-performance execution environment.
 
-    local LocalPlayer = Players.LocalPlayer
-    local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local RootPart = Character:WaitForChild("HumanoidRootPart")
-    local Humanoid = Character:WaitForChild("Humanoid")
+local function __MATRIX_EXECUTE__()
 
-    LocalPlayer.CharacterAdded:Connect(function(newCharacter)
-        Character = newCharacter
-        RootPart = newCharacter:WaitForChild("HumanoidRootPart")
-        Humanoid = newCharacter:WaitForChild("Humanoid")
-    end)
-
-    -- Configuration Matrix
+    -- =====================================================================
+    -- SECTION 0: COMPREHENSIVE CONFIGURATION MATRIX
+    -- =====================================================================
     local Config = {
-        -- Automation Toggles
-        PetHuntEnabled = false,
-        ProtectionEnabled = false,
-        ProtectionRadius = 15,
-        ServerHopEnabled = false,
-        MaxServerPlayers = 2,
-        
-        -- Farming Systems
-        AutoFarmEnabled = false,
-        AutoWaterEnabled = false,
-        AutoHarvestEnabled = false,
-        AutoReplantEnabled = false,
-        SelectedSeed = "Carrot",
-        
-        -- Weather & Automation Oracle
-        WeatherMonitorEnabled = false,
-        WeatherNotificationEnabled = true,
-        WeatherFarmingMode = false,
-        TargetWeatherForFarming = "Rain",
-        
-        -- Shop Automation
-        AutoBuyGears = false,
-        TargetGear = "Super Watering Can",
-        MaxBudget = 1000000,
-        
-        -- Physics & Locomotion Matrix
-        FlyHeight = 2.5,
-        TweenSpeed = 45,
-        CombatDashSpeed = 160,
-        PathfindingRadius = 1.5,
-        FullBright = false,
-        InfiniteZoom = false,
-        AntiFling = false,
-        InstantPrompt = false,
-        BypassGameplayPaused = false,
+        -- [CORE ENGINE SETTINGS]
+        EngineVersion = "6.2 Omni-Recon",
+        DebugMode = false,
+        VerboseLogging = true,
+        StorageKey = "PremiumUI_StableConfig_v6.json",
 
-        -- Targeted Filter Matrices
+        -- [INTERCEPTION & PET HUNTING SETTINGS]
+        PetHuntEnabled = false,
+        ProtectionEnabled = false, 
+        ProtectionRadius = 15,     
         TargetPets = {
             ["Frog"] = false, ["Bunny"] = false, ["Owl"] = false,
             ["Deer"] = false, ["Robin"] = false, ["Turtle"] = false,
             ["Bee"] = false, ["Raccoon"] = false, ["Monkey"] = false,
             ["Unicorn"] = false, ["GoldenDragonfly"] = false,
-            ["Bear"] = false, ["BlackDragon"] = false, ["IceSerpent"] = false
+            ["Bear"] = false, ["BlackDragon"] = false, ["IceSerpent"] = false,
+        },
+        
+        -- [SERVER NAVIGATION & ROTATION]
+        ServerHopEnabled = false,
+        MaxServerPlayers = 2,
+        AutoJoinPetHunt = false,
+
+        -- [VELOCITY & MOVEMENT PROFILES]
+        TeleportMode = "Tween", -- Tween, Walk, Teleport
+        FlyHeight = 2.2,
+        TweenSpeed = 38,           
+        CombatDashSpeed = 155,    
+        PathfindingRadius = 2.0,
+        
+        -- [ENVIRONMENTAL OPTIMIZATION & QOL]
+        AutoRemoveOtherGardens = false,
+        AutoReduceLag = false,
+        FullBright = false,
+        InfiniteZoom = false,
+        AntiFling = false,
+        LessKnockback = false,
+        InstantPrompt = false,
+        BypassGameplayPaused = false,
+        SkipLoadingScreen = false,
+        CmdrLoggerEnabled = false,
+
+        -- [AGRICULTURAL AUTOMATION (GARDEN)]
+        AutoPlantEnabled = false,
+        AutoWaterEnabled = false,
+        AutoFertilizeEnabled = false,
+        AutoMutatePlants = false,
+        AutoCollectOffline = false,
+        AutoExpandGarden = false,
+        AutoPlaceSprinklers = false,
+        AutoPlaceRakes = false,
+        TargetSeedForAutoBuy = "Carrot",
+
+        -- [HARVESTING & EXTRACTION LOGIC]
+        AutoHarvestMature = false,
+        AutoHarvestElectric = false,
+        AutoHarvestFrozen = false,
+        AutoHarvestStarstruck = false,
+        AutoHarvestAurora = false,
+        AutoHarvestIgnited = false,
+        AutoSellHarvested = false,
+        AutoPromoteFruit = false,
+        KeepBestFruit = false,
+
+        -- [CLIMATIC & LUNAR FARMING MODES]
+        WeatherMonitorEnabled = false,
+        WeatherNotificationEnabled = true,
+        WeatherFarmingMode = false,
+        TargetWeatherForFarming = "Rain",
+        AutoPlantDuringRain = false,
+        AutoWaterDuringRain = false,
+        MoonEventAlertEnabled = true,
+        BloodmoonCombatEnabled = false,
+        GoldmoonAutoHarvest = false,
+        MegaMoonAlertEnabled = false,
+        RainbowMoonAlertEnabled = false,
+        
+        -- [COMMERCIAL & ECONOMY AUTOMATION]
+        AutoUseDailyDeals = false,
+        AutoUseDoubleOrNothing = false,
+        DoubleOrNothingThreshold = 5000,
+        AuctionSniperEnabled = false,
+        AuctionMaxPrice = 1000000,
+        AuctionTargetItem = "Ice Serpent",
+        AuctionAutoRarity = "Super",
+        SeedShopAutoBuy = false,
+        GearShopAutoBuy = false,
+        CrateShopAutoBuy = false,
+        EggShopAutoBuy = false,
+
+        -- [SYNDICATE (GUILD) & SOCIAL INTEGRATION]
+        GuildEnabled = false,
+        GuildAutoClaimRewards = false,
+        GuildAutoJoinLeaderboard = false,
+        GuildAutoAuctionBid = false,
+        GuildTargetAuctionPrice = 500000,
+        AutoClaimMail = false,
+        GiftBestToGuild = false,
+        AutoGiftToSpecificPlayer = false,
+        AutoGiftTargetPlayer = "",
+
+        -- [CHARACTER ARCHETYPES]
+        AutoSpendSkillPoints = false,
+        SkillAllocationPriority = "Watering",
+
+        -- [EXTRA-SENSORY PERCEPTION (ESP) ENGINE]
+        ESPEnabled = false,
+        ESPSelectedPets = "IceSerpent",
+        ESPSelectedRarities = "Select Options",
+        ESPSelectedSizes = "Select Options",
+        ESPShowFruit = false,
+        ESPShowRareFruitOnly = true,
+    }
+
+    -- =====================================================================
+    -- SECTION 1: SECURE SERVICE ACQUISITION
+    -- =====================================================================
+    local function SafeGetService(serviceName)
+        local status, service = pcall(function() return game:GetService(serviceName) end)
+        if status and service then return service end
+        return game:GetService(serviceName) -- Force throw if completely unavailable
+    end
+
+    local Players               = SafeGetService("Players")
+    local TweenService          = SafeGetService("TweenService")
+    local RunService            = SafeGetService("RunService")
+    local ReplicatedStorage     = SafeGetService("ReplicatedStorage")
+    local Workspace             = SafeGetService("Workspace")
+    local Lighting              = SafeGetService("Lighting")
+    local VirtualInputManager   = SafeGetService("VirtualInputManager")
+    local HttpService           = SafeGetService("HttpService")
+    local GuiService            = SafeGetService("GuiService")
+    local PathfindingService    = SafeGetService("PathfindingService")
+    local TeleportService       = SafeGetService("TeleportService")
+    local CoreGui               = SafeGetService("CoreGui")
+    local UserInputService      = SafeGetService("UserInputService")
+    local SoundService          = SafeGetService("SoundService")
+    local StarterGui            = SafeGetService("StarterGui")
+
+    local LocalPlayer = Players.LocalPlayer
+    local PLACE_ID = game.PlaceId
+
+    local OriginalEnvironmentState = {
+        Ambient = Lighting.Ambient,
+        ColorShift_Top = Lighting.ColorShift_Top,
+        ColorShift_Bottom = Lighting.ColorShift_Bottom,
+        Brightness = Lighting.Brightness,
+        FogEnd = Lighting.FogEnd,
+        GlobalShadows = Lighting.GlobalShadows,
+        OutdoorAmbient = Lighting.OutdoorAmbient,
+        ClockTime = Lighting.ClockTime
+    }
+
+    -- =====================================================================
+    -- SECTION 2: SYSTEM CACHES, REGISTRIES, & STATE TRACKERS
+    -- =====================================================================
+    local EngineState = {
+        ActiveTweens = {},
+        EventConnections = {},
+        VisualElementsESP = {},
+        DispatchedNotifications = {},
+        LoopIntervals = {
+            fast = 0.05,
+            medium = 0.5,
+            slow = 2.0,
+            verySlow = 5.0
+        },
+        Timers = {
+            lastHopAttempt = 0,
+            lastNetworkPing = 0,
+            lastGardenScan = 0
+        },
+        UI = {
+            ToggleRegistry = {},
+            ShopMultiSelect = {} -- Core tracker for the new auto-shop sidebar
         }
     }
 
-    -- Database definitions parsed from internal source structures
-    local SeedDatabase = {
-        ["Carrot"] = { Cost = 1, Rarity = "Common", PrimeTime = 60, SingleHarvest = true },
-        ["Strawberry"] = { Cost = 10, Rarity = "Common", PrimeTime = 120, SingleHarvest = false },
-        ["Romanesco"] = { Cost = 500, Rarity = "Mythic", PrimeTime = 240, SingleHarvest = false },
-        ["Horned Melon"] = { Cost = 1000, Rarity = "Rare", PrimeTime = 240, SingleHarvest = false }
+    local FilterESP = { Pets = {}, Rarities = {}, Sizes = {}, Fruit = {} }
+
+    local function LogVerbose(message)
+        if Config.VerboseLogging then
+            print(string.format("[PREMIUM ENGINE]: %s", tostring(message)))
+        end
+    end
+
+    local function LogDebug(message)
+        if Config.DebugMode then
+            warn(string.format("[ENGINE DEBUG]: %s", tostring(message)))
+        end
+    end
+
+    local function UpdateESPCache(cacheType, commaStr)
+        FilterESP[cacheType] = {}
+        if not commaStr or commaStr == "None" or commaStr == "Select Options" or commaStr == "All" or commaStr == "" then 
+            if commaStr == "All" then FilterESP[cacheType]["*"] = true end
+            return 
+        end
+        for token in string.gmatch(commaStr, "[^,%s]+") do
+            local cleanToken = string.lower(string.gsub(token, "%s+", ""))
+            FilterESP[cacheType][cleanToken] = true
+        end
+    end
+
+    -- =====================================================================
+    -- SECTION 3: EMBEDDED COMPILED DATABASES (DATA INTEGRATION)
+    -- =====================================================================
+    -- Data meticulously extracted from compiled.lua references (EggData, SeedData, GearShopData, WeatherData, TimeCycleData)
+
+    local Database = {
+        Pets = {
+            {"Frog", "Frog", "Common", "$10K"},
+            {"Bunny", "Bunny", "Common", "$20K"},
+            {"Owl", "Owl", "Uncommon", "$25K"},
+            {"Deer", "Deer", "Rare", "$50K"},
+            {"Turtle", "Turtle", "Rare", "$70K"},
+            {"Robin", "Robin", "Legendary", "$75K"},
+            {"Bee", "Bee", "Legendary", "$1M"},
+            {"Monkey", "Monkey", "Mythic", "$1M"},
+            {"Golden Dragonfly", "GoldenDragonfly", "Mythic", "$3M"},
+            {"Unicorn", "Unicorn", "Mythic", "$4M"},
+            {"Raccoon", "Raccoon", "Super", "$5M"},
+            {"Bear", "Bear", "Mythic", "$5M"},
+            {"Black Dragon", "BlackDragon", "Super", "$20M"},
+            {"Ice Serpent", "IceSerpent", "Super", "$20M"},
+        },
+        Seeds = {
+            {"Carrot", 1, "Common", 60},
+            {"Strawberry", 10, "Common", 90},
+            {"Blueberry", 25, "Common", 90},
+            {"Lemon", 50, "Uncommon", 120},
+            {"Apple", 100, "Uncommon", 150},
+            {"Tomato", 200, "Rare", 180},
+            {"Pepper", 500, "Rare", 200},
+            {"Pineapple", 1000, "Rare", 240},
+            {"Mango", 2500, "Legendary", 300},
+            {"Cherry", 5000, "Legendary", 360},
+            {"Watermelon", 10000, "Legendary", 420},
+            {"Dragonfruit", 25000, "Mythic", 500},
+            {"Grape", 50000, "Mythic", 600},
+            {"Romanesco", 150000, "Mythic", 240},
+            {"Horned Melon", 200000, "Rare", 240},
+            {"Venus Fly Trap", 7000000, "Mythic", 900},
+            {"Poison Apple", 25000000, "Mythic", 1800}
+        },
+        Gears = {
+            {"Common Watering Can", 2000, "Common", "Watering Can"},
+            {"Common Sprinkler", 3000, "Common", "Sprinkler"},
+            {"Sign", 4000, "Common", "Sign"},
+            {"Megaphone", 8000, "Rare", "Megaphone"},
+            {"Uncommon Sprinkler", 10000, "Uncommon", "Sprinkler"},
+            {"Rare Sprinkler", 80000, "Rare", "Sprinkler"},
+            {"Legendary Sprinkler", 1200000, "Legendary", "Sprinkler"},
+            {"Super Sprinkler", 300000, "Super", "Sprinkler"},
+            {"Super Watering Can", 1000000, "Super", "Watering Can"},
+            {"Basic Pot", 300000, "Epic", "EmptyPot"},
+            {"Trowel", 1000, "Rare", "Trowel"},
+            {"Wheelbarrow", 500000, "Legendary", "Wheelbarrow"},
+            {"Strawberry Sniper", 13000000, "Mythic", "StrawberrySniper"},
+            {"Teleporter", 60000, "Legendary", "Teleporter"},
+            {"Flashbang", 20000, "Epic", "Flashbang"},
+            {"Player Magnet", 7000000, "Mythic", "Player Magnet"}
+        },
+        Mushrooms = {
+            {"Speed Mushroom", 1500, "Rare"},
+            {"Jump Mushroom", 1800, "Rare"},
+            {"Shrink Mushroom", 10000, "Epic"},
+            {"Supersize Mushroom", 20000, "Epic"},
+            {"Invisibility Mushroom", 30000, "Legendary"}
+        },
+        Weather = {
+            ["Rain"] = {Desc = "X2 Growth Speed!", Color = "#55FF55"},
+            ["Lightning"] = {Desc = "Chance for electric fruit", Color = "#FFD700"},
+            ["Rainbow"] = {Desc = "Boosted rainbow luck!", Color = "#FF0000"},
+            ["Snowfall"] = {Desc = "Chance for frozen fruit!", Color = "#88DDFF"},
+            ["Starfall"] = {Desc = "Chance for starstruck fruit!", Color = "#E88BFF"},
+            ["Aurora"] = {Desc = "Chance for Aurora fruit!", Color = "#00FFDD"},
+            ["Sunburst"] = {Desc = "Chance for Ignited fruit!", Color = "#FF6A00"}
+        },
+        TimeCycles = {
+            {"Day", 450, "#FF8C00"},
+            {"Sunset", 30, "#FF6600"},
+            {"Night", 120, "#1E1E50"}
+        },
+        RarityColors = {
+            ["Common"] = "#FFFFFF", 
+            ["Uncommon"] = "#00FF00", 
+            ["Rare"] = "#00BFFF",
+            ["Epic"] = "#A020F0",
+            ["Legendary"] = "#FFFF00", 
+            ["Mythic"] = "#FF0000", 
+            ["Super"] = "#FF00FF",
+            ["Secret"] = "#8B00FF", 
+            ["Unknown"] = "#AAAAAA"
+        },
+        FruitValues = {
+            ["Common"] = 10, ["Uncommon"] = 50, ["Rare"] = 250, ["Epic"] = 1000,
+            ["Legendary"] = 2000, ["Mythic"] = 10000, ["Super"] = 50000,
+            ["Secret"] = 100000
+        }
     }
 
-    local GearDatabase = {
-        ["Common Watering Can"] = { Cost = 2000, Rarity = "Common" },
-        ["Common Sprinkler"] = { Cost = 3000, Rarity = "Common" },
-        ["Super Pet Lure"] = { Cost = 500000, Rarity = "Super" },
-        ["Super Watering Can"] = { Cost = 1000000, Rarity = "Super" },
-        ["Basic Pot"] = { Cost = 300000, Rarity = "Epic" }
+    -- =====================================================================
+    -- SECTION 4: HIGH-FIDELITY PACKET NETWORKING ENGINE
+    -- =====================================================================
+    -- This module mimics the structure defined in Compiled.lua (packet.txt & networking.txt)
+    -- It provides a resilient, fallback-capable method to find and fire game remotes.
+
+    local NetworkEngine = {
+        ResolvedRemote = nil,
+        RouteFound = false,
+        FallbackPaths = {
+            "Network", "Remote", "Packets", "Remotes", "API"
+        }
     }
 
-    -- Execution Safeguard wrappers
-    local function SafeExecute(f, ...)
-        local status, result = pcall(f, ...)
-        if not status then
-            warn("[SYSTEM EXCEPTION TRIGGERED]: " .. tostring(result))
-        end
-        return status, result
-    end
+    function NetworkEngine:LocateCommunicationChannel()
+        if self.RouteFound and self.ResolvedRemote then return self.ResolvedRemote end
 
-    -- ============================================================
-    -- SECTION 2: UI ENGINE & STYLING FRAMEWORK
-    -- ============================================================
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "ControlSuite_v11"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
-    -- Ensure clean execution over multiple injections
-    local priorUI = CoreGui:FindFirstChild(ScreenGui.Name)
-    if priorUI then priorUI:Destroy() end
-    ScreenGui.Parent = CoreGui
-
-    -- Main Container Window
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 720, 0, 480)
-    MainFrame.Position = UDim2.new(0.5, -360, 0.5, -240)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(18, 22, 28)
-    MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = true
-    MainFrame.Parent = ScreenGui
-
-    local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 10)
-    MainCorner.Parent = MainFrame
-
-    local MainStroke = Instance.new("UIStroke")
-    MainStroke.Color = Color3.fromRGB(38, 45, 56)
-    MainStroke.Thickness = 1.5
-    MainStroke.Parent = MainFrame
-
-    -- Dragging System Handling
-    local dragging, dragInput, dragStart, startPos
-    MainFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = MainFrame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
-        end
-    end)
-    MainFrame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-
-    -- Top Display Banner Area
-    local TopBar = Instance.new("Frame")
-    TopBar.Name = "TopBar"
-    TopBar.Size = UDim2.new(1, 0, 0, 45)
-    TopBar.BackgroundColor3 = Color3.fromRGB(24, 29, 37)
-    TopBar.BorderSizePixel = 0
-    TopBar.Parent = MainFrame
-
-    local TopCorner = Instance.new("UICorner")
-    TopCorner.CornerRadius = UDim.new(0, 10)
-    TopCorner.Parent = TopBar
-
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Size = UDim2.new(0, 400, 1, 0)
-    TitleLabel.Position = UDim2.new(0, 15, 0, 0)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = "GARDEN TYCOON — ADVANCED ENGINE v11.0"
-    TitleLabel.TextColor3 = Color3.fromRGB(240, 243, 246)
-    TitleLabel.Font = Enum.Font.GothamBold
-    TitleLabel.TextSize = 14
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.Parent = TopBar
-
-    -- Modern Interactive Sidebar Navigation
-    local Sidebar = Instance.new("Frame")
-    Sidebar.Name = "Sidebar"
-    Sidebar.Size = UDim2.new(0, 180, 1, -45)
-    Sidebar.Position = UDim2.new(0, 0, 0, 45)
-    Sidebar.BackgroundColor3 = Color3.fromRGB(15, 19, 24)
-    Sidebar.BorderSizePixel = 0
-    Sidebar.Parent = MainFrame
-
-    local SidebarLayout = Instance.new("UIListLayout")
-    SidebarLayout.Padding = UDim.new(0, 4)
-    SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    SidebarLayout.Parent = Sidebar
-
-    local SidebarPadding = Instance.new("UIPadding")
-    SidebarPadding.PaddingTop = UDim.new(0, 10)
-    SidebarPadding.PaddingLeft = UDim.new(0, 8)
-    SidebarPadding.PaddingRight = UDim.new(0, 8)
-    SidebarPadding.Parent = Sidebar
-
-    -- Main Content View Deck Area
-    local ContentDisplayDeck = Instance.new("Frame")
-    ContentDisplayDeck.Name = "ContentDisplayDeck"
-    ContentDisplayDeck.Size = UDim2.new(1, -180, 1, -45)
-    ContentDisplayDeck.Position = UDim2.new(0, 180, 0, 45)
-    ContentDisplayDeck.BackgroundTransparency = 1
-    ContentDisplayDeck.Parent = MainFrame
-
-    local tabModules = {}
-    local activeTab = nil
-
-    local function CreateTab(tabName, assetId)
-        local TabButton = Instance.new("TextButton")
-        TabButton.Name = tabName .. "Btn"
-        TabButton.Size = UDim2.new(1, 0, 0, 36)
-        TabButton.BackgroundColor3 = Color3.fromRGB(24, 29, 37)
-        TabButton.BackgroundTransparency = 1
-        TabButton.Text = "   " .. tabName
-        TabButton.TextColor3 = Color3.fromRGB(150, 160, 175)
-        TabButton.Font = Enum.Font.GothamMedium
-        TabButton.TextSize = 12
-        TabButton.TextXAlignment = Enum.TextXAlignment.Left
-        TabButton.AutoButtonColor = false
-        TabButton.Parent = Sidebar
-
-        local ButtonCorner = Instance.new("UICorner")
-        ButtonCorner.CornerRadius = UDim.new(0, 6)
-        ButtonCorner.Parent = TabButton
-
-        local PageView = Instance.new("ScrollingFrame")
-        PageView.Name = tabName .. "Page"
-        PageView.Size = UDim2.new(1, 0, 1, 0)
-        PageView.BackgroundTransparency = 1
-        PageView.BorderSizePixel = 0
-        PageView.ScrollBarThickness = 4
-        PageView.ScrollBarImageColor3 = Color3.fromRGB(45, 55, 70)
-        PageView.Visible = false
-        PageView.Parent = ContentDisplayDeck
-
-        local PageLayout = Instance.new("UIListLayout")
-        PageLayout.Padding = UDim.new(0, 8)
-        PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        PageLayout.Parent = PageView
-
-        local PagePadding = Instance.new("UIPadding")
-        PagePadding.PaddingTop = UDim.new(0, 12)
-        PagePadding.PaddingLeft = UDim.new(0, 15)
-        PagePadding.PaddingRight = UDim.new(0, 15)
-        PagePadding.Parent = PageView
-
-        TabButton.MouseButton1Click:Connect(function()
-            for _, info in pairs(tabModules) do
-                info.Button.BackgroundTransparency = 1
-                info.Button.TextColor3 = Color3.fromRGB(150, 160, 175)
-                info.Page.Visible = false
-            end
-            TabButton.BackgroundTransparency = 0
-            TabButton.BackgroundColor3 = Color3.fromRGB(28, 35, 45)
-            TabButton.TextColor3 = Color3.fromRGB(0, 180, 255)
-            PageView.Visible = true
-            activeTab = tabName
-        end)
-
-        tabModules[tabName] = { Button = TabButton, Page = PageView }
-        return PageView
-    end
-
-    -- Visual Interface Dynamic Factory Methods
-    local function AddInterfaceToggle(page, text, configKey, callback)
-        local Container = Instance.new("Frame")
-        Container.Size = UDim2.new(1, 0, 0, 40)
-        Container.BackgroundColor3 = Color3.fromRGB(24, 29, 37)
-        Container.BorderSizePixel = 0
-        Container.Parent = page
-
-        local Corner = Instance.new("UICorner")
-        Corner.CornerRadius = UDim.new(0, 6)
-        Corner.Parent = Container
-
-        local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(0.7, 0, 1, 0)
-        Label.Position = UDim2.new(0, 12, 0, 0)
-        Label.BackgroundTransparency = 1
-        Label.Text = text
-        Label.TextColor3 = Color3.fromRGB(210, 218, 226)
-        Label.Font = Enum.Font.GothamMedium
-        Label.TextSize = 13
-        Label.TextXAlignment = Enum.TextXAlignment.Left
-        Label.Parent = Container
-
-        local ToggleBtn = Instance.new("TextButton")
-        ToggleBtn.Size = UDim2.new(0, 46, 0, 24)
-        ToggleBtn.Position = UDim2.new(1, -58, 0.5, -12)
-        ToggleBtn.BackgroundColor3 = Config[configKey] and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(45, 52, 64)
-        ToggleBtn.Text = ""
-        ToggleBtn.AutoButtonColor = false
-        ToggleBtn.Parent = Container
-
-        local ToggleCorner = Instance.new("UICorner")
-        ToggleCorner.CornerRadius = UDim.new(1, 0)
-        ToggleCorner.Parent = ToggleBtn
-
-        local Indicator = Instance.new("Frame")
-        Indicator.Size = UDim2.new(0, 18, 0, 18)
-        Indicator.Position = Config[configKey] and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 4, 0.5, -9)
-        Indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        Indicator.BorderSizePixel = 0
-        Indicator.Parent = ToggleBtn
-
-        local IndicatorCorner = Instance.new("UICorner")
-        IndicatorCorner.CornerRadius = UDim.new(1, 0)
-        IndicatorCorner.Parent = Indicator
-
-        ToggleBtn.MouseButton1Click:Connect(function()
-            Config[configKey] = not Config[configKey]
-            local targetPosition = Config[configKey] and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 4, 0.5, -9)
-            local targetColor = Config[configKey] and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(45, 52, 64)
-            
-            TweenService:Create(Indicator, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Position = targetPosition}):Play()
-            TweenService:Create(ToggleBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundColor3 = targetColor}):Play()
-            
-            if callback then SafeExecute(callback, Config[configKey]) end
-        end)
-    end
-
-    local function AddInterfaceDropdown(page, text, listOptions, configKey, callback)
-        local Container = Instance.new("Frame")
-        Container.Size = UDim2.new(1, 0, 0, 40)
-        Container.BackgroundColor3 = Color3.fromRGB(24, 29, 37)
-        Container.BorderSizePixel = 0
-        Container.ClipsDescendants = false
-        Container.Parent = page
-
-        local Corner = Instance.new("UICorner")
-        Corner.CornerRadius = UDim.new(0, 6)
-        Corner.Parent = Container
-
-        local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(0.4, 0, 1, 0)
-        Label.Position = UDim2.new(0, 12, 0, 0)
-        Label.BackgroundTransparency = 1
-        Label.Text = text
-        Label.TextColor3 = Color3.fromRGB(210, 218, 226)
-        Label.Font = Enum.Font.GothamMedium
-        Label.TextSize = 13
-        Label.TextXAlignment = Enum.TextXAlignment.Left
-        Label.Parent = Container
-
-        local DropdownBtn = Instance.new("TextButton")
-        DropdownBtn.Size = UDim2.new(0.5, 0, 0, 28)
-        DropdownBtn.Position = UDim2.new(1, -12, 0.5, -14)
-        DropdownBtn.AnchorPoint = Vector2.new(1, 0)
-        DropdownBtn.BackgroundColor3 = Color3.fromRGB(34, 40, 52)
-        DropdownBtn.Text = tostring(Config[configKey]) .. "  ▼"
-        DropdownBtn.TextColor3 = Color3.fromRGB(240, 243, 246)
-        DropdownBtn.Font = Enum.Font.GothamMedium
-        DropdownBtn.TextSize = 12
-        DropdownBtn.Parent = Container
-
-        local DropCorner = Instance.new("UICorner")
-        DropCorner.CornerRadius = UDim.new(0, 4)
-        DropCorner.Parent = DropdownBtn
-
-        local DropList = Instance.new("Frame")
-        DropList.Size = UDim2.new(1, 0, 0, #listOptions * 30)
-        DropList.Position = UDim2.new(0, 0, 1, 4)
-        DropList.BackgroundColor3 = Color3.fromRGB(20, 25, 33)
-        DropList.BorderSizePixel = 0
-        DropList.Visible = false
-        DropList.ZIndex = 10
-        DropList.Parent = DropdownBtn
-
-        local ListStroke = Instance.new("UIStroke")
-        ListStroke.Color = Color3.fromRGB(45, 55, 70)
-        ListStroke.Thickness = 1
-        ListStroke.Parent = DropList
-
-        local ListLayout = Instance.new("UIListLayout")
-        ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        ListLayout.Parent = DropList
-
-        DropdownBtn.MouseButton1Click:Connect(function()
-            DropList.Visible = not DropList.Visible
-        end)
-
-        for i, option in ipairs(listOptions) do
-            local OptBtn = Instance.new("TextButton")
-            OptBtn.Size = UDim2.new(1, 0, 0, 30)
-            OptBtn.BackgroundColor3 = Color3.fromRGB(24, 29, 37)
-            OptBtn.BackgroundTransparency = 1
-            OptBtn.Text = tostring(option)
-            OptBtn.TextColor3 = Color3.fromRGB(180, 190, 205)
-            OptBtn.Font = Enum.Font.GothamMedium
-            OptBtn.TextSize = 12
-            OptBtn.ZIndex = 11
-            OptBtn.Parent = DropList
-
-            OptBtn.MouseButton1Click:Connect(function()
-                Config[configKey] = option
-                DropdownBtn.Text = tostring(option) .. "  ▼"
-                DropList.Visible = false
-                if callback then SafeExecute(callback, option) end
-            end)
-        end
-    end
-
-    local function AddInterfaceSlider(page, text, min, max, configKey, callback)
-        local Container = Instance.new("Frame")
-        Container.Size = UDim2.new(1, 0, 0, 50)
-        Container.BackgroundColor3 = Color3.fromRGB(24, 29, 37)
-        Container.BorderSizePixel = 0
-        Container.Parent = page
-
-        local Corner = Instance.new("UICorner")
-        Corner.CornerRadius = UDim.new(0, 6)
-        Corner.Parent = Container
-
-        local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(0.6, 0, 0, 25)
-        Label.Position = UDim2.new(0, 12, 0, 4)
-        Label.BackgroundTransparency = 1
-        Label.Text = text
-        Label.TextColor3 = Color3.fromRGB(210, 218, 226)
-        Label.Font = Enum.Font.GothamMedium
-        Label.TextSize = 13
-        Label.TextXAlignment = Enum.TextXAlignment.Left
-        Label.Parent = Container
-
-        local ValLabel = Instance.new("TextLabel")
-        ValLabel.Size = UDim2.new(0.3, 0, 0, 25)
-        ValLabel.Position = UDim2.new(0.7, -12, 0, 4)
-        ValLabel.BackgroundTransparency = 1
-        ValLabel.Text = tostring(Config[configKey])
-        ValLabel.TextColor3 = Color3.fromRGB(0, 180, 255)
-        ValLabel.Font = Enum.Font.GothamBold
-        ValLabel.TextSize = 13
-        ValLabel.TextXAlignment = Enum.TextXAlignment.Right
-        ValLabel.Parent = Container
-
-        local Track = Instance.new("Frame")
-        Track.Size = UDim2.new(1, -24, 0, 6)
-        Track.Position = UDim2.new(0, 12, 1, -12)
-        Track.BackgroundColor3 = Color3.fromRGB(45, 52, 64)
-        Track.BorderSizePixel = 0
-        Track.Parent = Container
-
-        local Fill = Instance.new("Frame")
-        local pct = (Config[configKey] - min) / (max - min)
-        Fill.Size = UDim2.new(pct, 0, 1, 0)
-        Fill.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-        Fill.BorderSizePixel = 0
-        Fill.Parent = Track
-
-        local SliderBtn = Instance.new("TextButton")
-        SliderBtn.Size = UDim2.new(1, 0, 1, 0)
-        SliderBtn.BackgroundTransparency = 1
-        SliderBtn.Text = ""
-        SliderBtn.Parent = Track
-
-        local function updateSlider(input)
-            local xOffset = math.clamp(input.Position.X - Track.AbsolutePosition.X, 0, Track.AbsoluteSize.X)
-            local percentage = xOffset / Track.AbsoluteSize.X
-            local rawVal = min + (percentage * (max - min))
-            local finalVal = math.floor(rawVal)
-            
-            Config[configKey] = finalVal
-            ValLabel.Text = tostring(finalVal)
-            Fill.Size = UDim2.new(percentage, 0, 1, 0)
-            
-            if callback then SafeExecute(callback, finalVal) end
-        end
-
-        local sliding = false
-        SliderBtn.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                sliding = true
-                updateSlider(input)
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(input)
-            if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                updateSlider(input)
-            end
-        end)
-        UserInputService.InputBegan:Connect(function(input)
-            if sliding and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-                sliding = false
-            end
-        end)
-    end
-
-    -- Instantiate Visual Page Architectures
-    local DashPage = CreateTab("Dashboard")
-    local FarmPage = CreateTab("Farming")
-    local PetsPage = CreateTab("Pets")
-    local WeatherPage = CreateTab("Weather")
-    local ShopPage = CreateTab("Shop")
-    local SettPage = CreateTab("Settings")
-
-    -- ============================================================
-    -- SECTION 3: AUTOMATION ENGINES & CORE LOGIC
-    -- ============================================================
-    
-    -- 1. Dashboard Instrumentation Panel Setup
-    local OverviewCard = Instance.new("Frame")
-    OverviewCard.Size = UDim2.new(1, 0, 0, 100)
-    OverviewCard.BackgroundColor3 = Color3.fromRGB(24, 29, 37)
-    OverviewCard.Parent = DashPage
-
-    local CardCorner = Instance.new("UICorner")
-    CardCorner.CornerRadius = UDim.new(0, 8)
-    CardCorner.Parent = OverviewCard
-
-    local StatusLog = Instance.new("TextLabel")
-    StatusLog.Size = UDim2.new(1, -24, 1, -24)
-    StatusLog.Position = UDim2.new(0, 12, 0, 12)
-    StatusLog.BackgroundTransparency = 1
-    StatusLog.Text = "SYSTEM ENGAGED\n\nActive Workers: 0\nPerformance Buffer: Stable\nSecurity Signature: Enforced"
-    StatusLog.TextColor3 = Color3.fromRGB(170, 255, 170)
-    StatusLog.Font = Enum.Font.Code
-    StatusLog.TextSize = 12
-    StatusLog.TextXAlignment = Enum.TextXAlignment.Left
-    StatusLog.Parent = OverviewCard
-
-    -- 2. Farming System Panel & Mechanics Loop
-    AddInterfaceToggle(FarmPage, "Master Auto Farm System", "AutoFarmEnabled")
-    AddInterfaceToggle(FarmPage, "Automate Water Flow Checks", "AutoWaterEnabled")
-    AddInterfaceToggle(FarmPage, "Automate Fruit/Crop Harvesting", "AutoHarvestEnabled")
-    AddInterfaceToggle(FarmPage, "Automate Adaptive Replanting Mode", "AutoReplantEnabled")
-    
-    local seedOptionsList = {}
-    for seedName, _ in pairs(SeedDatabase) do table.insert(seedOptionsList, seedName) end
-    AddInterfaceDropdown(FarmPage, "Target Cultivation Matrix", seedOptionsList, "SelectedSeed")
-
-    task.spawn(function()
-        while task.wait(0.5) do
-            if Config.AutoFarmEnabled then
-                SafeExecute(function()
-                    local Plots = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Gardens")
-                    if Plots then
-                        for _, plot in ipairs(Plots:GetChildren()) do
-                            -- Confirm plot owner identity match
-                            if plot:GetAttribute("Owner") == LocalPlayer.Name or plot.Name == LocalPlayer.Name .. "Plot" then
-                                if Config.AutoHarvestEnabled and plot:GetAttribute("Stage") == "Mature" then
-                                    RootPart.CFrame = plot.PrimaryPart.CFrame + Vector3.new(0, Config.FlyHeight, 0)
-                                    task.wait(0.2)
-                                    local prompt = plot:FindFirstChildOfClass("ProximityPrompt")
-                                    if prompt then fireproximityprompt(prompt) end
-                                end
-                                
-                                if Config.AutoWaterEnabled and plot:GetAttribute("NeedsWater") == true then
-                                    RootPart.CFrame = plot.PrimaryPart.CFrame + Vector3.new(0, Config.FlyHeight, 0)
-                                    task.wait(0.2)
-                                    local tool = LocalPlayer.Backpack:FindFirstChild("Watering Can") or Character:FindFirstChild("Watering Can")
-                                    if tool then
-                                        Humanoid:EquipTool(tool)
-                                        tool:Activate()
-                                    end
-                                end
-
-                                if Config.AutoReplantEnabled and plot:GetAttribute("Stage") == "Empty" then
-                                    RootPart.CFrame = plot.PrimaryPart.CFrame + Vector3.new(0, Config.FlyHeight, 0)
-                                    task.wait(0.2)
-                                    local remote = ReplicatedStorage:FindFirstChild("PlantSeed", true) or ReplicatedStorage:FindFirstChild("Plant", true)
-                                    if remote and remote:IsA("RemoteEvent") then
-                                        remote:FireServer(plot, Config.SelectedSeed)
-                                    end
-                                end
-                            end
+        -- 1. Check known fallback paths in ReplicatedStorage
+        for _, path in ipairs(self.FallbackPaths) do
+            local target = ReplicatedStorage:FindFirstChild(path)
+            if target and (target:IsA("RemoteEvent") or target:IsA("RemoteFunction") or target:IsA("Folder")) then
+                -- If it's a folder, look for an event inside
+                if target:IsA("Folder") then
+                    for _, child in ipairs(target:GetChildren()) do
+                        if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+                            self.ResolvedRemote = child
+                            self.RouteFound = true
+                            return child
                         end
                     end
-                end)
+                else
+                    self.ResolvedRemote = target
+                    self.RouteFound = true
+                    return target
+                end
             end
         end
-    end)
 
-    -- 3. Pet Interception Framework & Speed Mastery Loop
-    AddInterfaceToggle(PetsPage, "Enable Pet Interception Engine", "PetHuntEnabled")
-    AddInterfaceToggle(PetsPage, "Enable Proactive Player Guard", "ProtectionEnabled")
-    AddInterfaceSlider(PetsPage, "Guard Perimeter Field Radius (Studs)", 5, 50, "ProtectionRadius")
+        -- 2. Deep scan ReplicatedStorage for 'packet' or 'remote' named events
+        for _, descendant in ipairs(ReplicatedStorage:GetDescendants()) do
+            if descendant:IsA("RemoteEvent") or descendant:IsA("RemoteFunction") then
+                local name = string.lower(descendant.Name)
+                if string.find(name, "packet") or string.find(name, "network") then
+                    self.ResolvedRemote = descendant
+                    self.RouteFound = true
+                    return descendant
+                end
+            end
+        end
 
-    for petName, _ in pairs(Config.TargetPets) do
-        AddInterfaceToggle(PetsPage, "Target Capture: " .. petName, "TargetPets", function(val)
-            Config.TargetPets[petName] = val
-        end)
+        LogDebug("Network channel resolution failed. Actions requiring server communication may drop.")
+        return nil
     end
 
-    task.spawn(function()
-        while task.wait(0.1) do
-            if Config.PetHuntEnabled then
-                SafeExecute(function()
-                    local ActivePets = Workspace:FindFirstChild("Pets") or Workspace:FindFirstChild("WildPets")
-                    if ActivePets then
-                        for _, pet in ipairs(ActivePets:GetChildren()) do
-                            if Config.TargetPets[pet.Name] == true and pet:FindFirstChild("HumanoidRootPart") then
-                                -- Threat Assessment Check prior to teleportation sequence
-                                local threatDetected = false
-                                if Config.ProtectionEnabled then
-                                    for _, player in ipairs(Players:GetPlayers()) do
-                                        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                                            local distance = (pet.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                                            if distance <= Config.ProtectionRadius then
-                                                threatDetected = true
-                                                break
-                                            end
-                                        end
-                                    end
-                                end
+    function NetworkEngine:Fire(headerName, ...)
+        local channel = self:LocateCommunicationChannel()
+        if not channel then return false, "Channel Unresolved" end
 
-                                if not threatDetected then
-                                    local initialTime = os.clock()
-                                    while pet.Parent == ActivePets and (os.clock() - initialTime) < 3 do
-                                        RootPart.CFrame = pet.HumanoidRootPart.CFrame + Vector3.new(0, Config.FlyHeight, 0)
-                                        local distance = (RootPart.Position - pet.HumanoidRootPart.Position).Magnitude
-                                        if distance < 5 then
-                                            local prompt = pet:FindFirstChildOfClass("ProximityPrompt")
-                                            if prompt then fireproximityprompt(prompt) end
-                                            break
-                                        end
-                                        RunService.Heartbeat:Wait()
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end)
+        local success, result = pcall(function(...)
+            if channel:IsA("RemoteFunction") then
+                return channel:InvokeServer(headerName, ...)
+            elseif channel:IsA("RemoteEvent") then
+                channel:FireServer(headerName, ...)
+                return true
             end
+        end, ...)
+
+        if not success then
+            LogDebug("Packet Transmission Failed: [" .. tostring(headerName) .. "] - " .. tostring(result))
         end
-    end)
 
-    -- 4. Advanced Weather & Time Cycle Oracle (Parsed from compiled WeatherController structures)
-    AddInterfaceToggle(WeatherPage, "Activate Forecast Monitor", "WeatherMonitorEnabled")
-    AddInterfaceToggle(WeatherPage, "Enable System Broadcast Matrix", "WeatherNotificationEnabled")
-    AddInterfaceToggle(WeatherPage, "Automate Environmental Farming Logic", "WeatherFarmingMode")
-    AddInterfaceDropdown(WeatherPage, "Target Trigger Climate", {"Rain", "Lightning", "Rainbow", "Snowfall"}, "TargetWeatherForFarming")
+        return success, result
+    end
 
-    local WeatherCard = Instance.new("Frame")
-    WeatherCard.Size = UDim2.new(1, 0, 0, 80)
-    WeatherCard.BackgroundColor3 = Color3.fromRGB(24, 29, 37)
-    WeatherCard.Parent = WeatherPage
+    -- Specialized wrapper for Shop purchases
+    function NetworkEngine:PurchaseItem(itemType, itemName, amount)
+        amount = amount or 1
+        -- Based on compiled.lua packet structures:
+        -- e.g., v1("SeedShopPurchase", v1.String, v1.Number)
+        -- e.g., v1("GearShopPurchase", v1.String)
+        
+        local success = false
+        if itemType == "Seed" then
+            success = self:Fire("SeedShopPurchase", itemName, amount)
+            if not success then success = self:Fire("BuySeed", itemName, amount) end
+            if not success then success = self:Fire("PurchaseItem", "Seeds", itemName, amount) end
+        elseif itemType == "Gear" then
+            success = self:Fire("GearShopPurchase", itemName)
+            if not success then success = self:Fire("BuyGear", itemName) end
+            if not success then success = self:Fire("PurchaseItem", "Gears", itemName, 1) end
+        elseif itemType == "Egg" then
+            success = self:Fire("EggShopPurchase", itemName)
+            if not success then success = self:Fire("BuyEgg", itemName) end
+        elseif itemType == "Crate" then
+            success = self:Fire("CrateShopPurchase", itemName)
+        else
+            -- Generic fallback
+            success = self:Fire("BuyItem", itemName, amount)
+            if not success then success = self:Fire("Purchase", itemName, amount) end
+        end
 
-    local WeatherCorner = Instance.new("UICorner")
-    WeatherCorner.CornerRadius = UDim.new(0, 6)
-    WeatherCorner.Parent = WeatherCard
+        return success
+    end
 
-    local ForecastLabel = Instance.new("TextLabel")
-    ForecastLabel.Size = UDim2.new(1, -24, 1, -24)
-    ForecastLabel.Position = UDim2.new(0, 12, 0, 12)
-    ForecastLabel.BackgroundTransparency = 1
-    ForecastLabel.Text = "WEATHER LOGICAL MONITOR: ONLINE\n\nTracking server environmental state values..."
-    ForecastLabel.TextColor3 = Color3.fromRGB(0, 180, 255)
-    ForecastLabel.Font = Enum.Font.Code
-    ForecastLabel.TextSize = 12
-    ForecastLabel.TextXAlignment = Enum.TextXAlignment.Left
-    ForecastLabel.Parent = WeatherCard
+    -- =====================================================================
+    -- SECTION 5: MASTER AUTOMATION & LOGIC SYSTEMS
+    -- =====================================================================
+    local AutomationCore = {}
 
-    local WeatherValues = ReplicatedStorage:WaitForChild("WeatherValues", 10)
-    if WeatherValues then
-        local function UpdateOracleDisplay()
-            if not Config.WeatherMonitorEnabled then return end
-            local streamText = "CURRENT FORECAST MATRIX:\n"
-            local activeWeatherFound = false
-            
-            for _, attribute in ipairs({"Rain", "Lightning", "Rainbow", "Snowfall"}) do
-                local isPlaying = WeatherValues:GetAttribute(attribute .. "_Playing")
-                if isPlaying then
-                    activeWeatherFound = true
-                    local endTime = WeatherValues:GetAttribute(attribute .. "_EndTime") or 0
-                    local remaining = math.max(0, endTime - DateTime.now().UnixTimestamp)
-                    streamText = streamText .. string.format("\n[ACTIVE] %s | Remaining Time: %ds", attribute:upper(), remaining)
+    function AutomationCore:GetPlayerTycoon()
+        local possibleFolders = {
+            Workspace:FindFirstChild("Tycoons"),
+            Workspace:FindFirstChild("Gardens"),
+            Workspace:FindFirstChild("Plots")
+        }
+
+        for _, folder in ipairs(possibleFolders) do
+            if folder then
+                for _, tycoon in ipairs(folder:GetChildren()) do
+                    local ownerAttr = tycoon:GetAttribute("Owner") or tycoon:GetAttribute("OwnerID")
+                    local ownerVal = tycoon:FindFirstChild("Owner") or tycoon:FindFirstChild("Player")
                     
-                    if Config.WeatherFarmingMode and attribute == Config.TargetWeatherForFarming then
-                        Config.AutoFarmEnabled = true
+                    if tostring(ownerAttr) == LocalPlayer.Name or tostring(ownerAttr) == tostring(LocalPlayer.UserId) then
+                        return tycoon
+                    end
+                    if ownerVal and (ownerVal.Value == LocalPlayer or ownerVal.Value == LocalPlayer.Name) then
+                        return tycoon
                     end
                 end
             end
-            
-            if not activeWeatherFound then
-                streamText = streamText .. "\nNo atmospheric anomalies detected. System steady."
-                if Config.WeatherFarmingMode then Config.AutoFarmEnabled = false end
-            end
-            ForecastLabel.Text = streamText
         end
 
-        WeatherValues.AttributeChanged:Connect(UpdateOracleDisplay)
-        task.spawn(function()
-            while task.wait(1) do UpdateOracleDisplay() end
-        end)
-    end
-
-    -- 5. Dynamic Gear Restock & Inventory Shop Automation
-    AddInterfaceToggle(ShopPage, "Automate Gear Acquisitions", "AutoBuyGears")
-    local gearList = {}
-    for gearName, _ in pairs(GearDatabase) do table.insert(gearList, gearName) end
-    AddInterfaceDropdown(ShopPage, "Target Matrix Procurement Asset", gearList, "TargetGear")
-
-    task.spawn(function()
-        while task.wait(0.5) do
-            if Config.AutoBuyGears then
-                SafeExecute(function()
-                    local gearData = GearDatabase[Config.TargetGear]
-                    if gearData and gearData.Cost <= Config.MaxBudget then
-                        local shopRemote = ReplicatedStorage:FindFirstChild("BuyGear", true) or ReplicatedStorage:FindFirstChild("PurchaseItem", true)
-                        if shopRemote and shopRemote:IsA("RemoteFunction") then
-                            local success = shopRemote:InvokeServer(Config.TargetGear)
-                            if success then
-                                print(string.format("[PROCUREMENT SUCCESS]: Acquired specialized asset %s", Config.TargetGear))
+        -- Spatial proximity fallback
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local pos = LocalPlayer.Character.HumanoidRootPart.Position
+            local nearest, dist = nil, math.huge
+            for _, folder in ipairs(possibleFolders) do
+                if folder then
+                    for _, tycoon in ipairs(folder:GetChildren()) do
+                        local part = tycoon:FindFirstChildWhichIsA("BasePart", true)
+                        if part then
+                            local d = (part.Position - pos).Magnitude
+                            if d < dist and d < 150 then
+                                dist = d
+                                nearest = tycoon
                             end
                         end
                     end
-                end)
+                end
+            end
+            return nearest
+        end
+
+        return nil
+    end
+
+    function AutomationCore:GetPlantsAndPlots(tycoon)
+        if not tycoon then return {}, {} end
+        local plots = {}
+        local plants = {}
+
+        local plotsFolder = tycoon:FindFirstChild("Plots") or tycoon:FindFirstChild("Dirt") or tycoon
+        local plantsFolder = tycoon:FindFirstChild("Plants") or tycoon:FindFirstChild("Crops") or tycoon
+
+        if plotsFolder then
+            for _, p in ipairs(plotsFolder:GetChildren()) do
+                if p:IsA("BasePart") or string.find(string.lower(p.Name), "plot") then
+                    table.insert(plots, p)
+                end
             end
         end
-    end)
 
-    -- 6. Engine System Enhancements & Optimization Modifiers
-    AddInterfaceSlider(SettPage, "Locomotion Axis Elevation (Fly Height)", 1, 10, "FlyHeight")
-    AddInterfaceSlider(SettPage, "Linear System Interpolation Speed", 10, 100, "TweenSpeed")
-    AddInterfaceToggle(SettPage, "Enable High-Intensity Radiance Matrix", "FullBright", function(val)
-        if val then
-            game:GetService("Lighting").Ambient = Color3.fromRGB(255, 255, 255)
-            game:GetService("Lighting").OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-        else
-            game:GetService("Lighting").Ambient = Color3.fromRGB(128, 128, 128)
-            game:GetService("Lighting").OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        if plantsFolder then
+            for _, p in ipairs(plantsFolder:GetChildren()) do
+                if (p:IsA("Model") or p:IsA("BasePart")) and not string.find(string.lower(p.Name), "plot") then
+                    table.insert(plants, p)
+                end
+            end
         end
-    end)
-    AddInterfaceToggle(SettPage, "Enable Uncapped Infinite Camera Field", "InfiniteZoom", function(val)
-        LocalPlayer.MaxZoomDistance = val and 10000 or 400
-    end)
-    AddInterfaceToggle(SettPage, "Instant Prompt Interaction Engine", "InstantPrompt")
-    AddInterfaceToggle(SettPage, "Bypass Gameplay Paused Framework Layers", "BypassGameplayPaused")
 
-    -- Instant Proximity Interception Layer Hook
-    task.spawn(function()
-        while task.wait(0.2) do
-            if Config.InstantPrompt then
-                SafeExecute(function()
-                    for _, descendant in ipairs(Workspace:GetDescendants()) do
-                        if descendant:IsA("ProximityPrompt") then
-                            descendant.HoldDuration = 0
+        return plots, plants
+    end
+
+    function AutomationCore:RunAgricultureRoutine()
+        if not (Config.AutoPlantEnabled or Config.AutoWaterEnabled or Config.AutoHarvestMature or Config.AutoHarvestElectric or Config.AutoHarvestFrozen or Config.AutoHarvestStarstruck or Config.AutoHarvestAurora or Config.AutoHarvestIgnited or Config.AutoFertilizeEnabled or Config.AutoMutatePlants) then
+            return
+        end
+
+        local tycoon = self:GetPlayerTycoon()
+        if not tycoon then return end
+
+        local plots, plants = self:GetPlantsAndPlots(tycoon)
+
+        -- 1. Plot Management (Planting & Watering)
+        for _, plot in ipairs(plots) do
+            local isOccupied = plot:GetAttribute("Occupied") or plot:GetAttribute("PlantId") or plot:GetAttribute("HasPlant")
+            local waterLevel = plot:GetAttribute("Water") or plot:GetAttribute("Moisture") or plot:GetAttribute("WaterLevel")
+            
+            if Config.AutoWaterEnabled and type(waterLevel) == "number" and waterLevel < 30 then
+                NetworkEngine:Fire("GardenWaterPlant", plot.Position or plot.Name)
+                NetworkEngine:Fire("WaterPlot", plot.Name)
+                task.wait(0.01)
+            end
+
+            if Config.AutoPlantEnabled and (not isOccupied or isOccupied == "" or isOccupied == false) then
+                NetworkEngine:Fire("GardenPlantSeed", Config.TargetSeedForAutoBuy, plot.Position or plot.Name)
+                NetworkEngine:Fire("PlantSeed", plot.Name, Config.TargetSeedForAutoBuy)
+                task.wait(0.02)
+            end
+            
+            if Config.AutoFertilizeEnabled and isOccupied then
+                NetworkEngine:Fire("GardenFertilize", plot.Position or plot.Name)
+            end
+            
+            if Config.AutoMutatePlants and isOccupied then
+                NetworkEngine:Fire("GardenMutatePlant", plot.Position or plot.Name)
+            end
+        end
+
+        -- 2. Plant Management (Harvesting)
+        for _, plant in ipairs(plants) do
+            local isMature = plant:GetAttribute("Mature") or plant:GetAttribute("Ready") or plant:GetAttribute("Grown") or plant:FindFirstChild("Ready")
+            local rarity = plant:GetAttribute("Rarity") or plant:GetAttribute("FruitRarity") or plant:GetAttribute("Type") or "Common"
+            local rarityLower = string.lower(tostring(rarity))
+            
+            local shouldHarvest = false
+            
+            if Config.AutoHarvestMature and isMature then shouldHarvest = true end
+            if Config.AutoHarvestElectric and string.find(rarityLower, "electric") then shouldHarvest = true end
+            if Config.AutoHarvestFrozen and string.find(rarityLower, "frozen") then shouldHarvest = true end
+            if Config.AutoHarvestStarstruck and string.find(rarityLower, "starstruck") then shouldHarvest = true end
+            if Config.AutoHarvestAurora and string.find(rarityLower, "aurora") then shouldHarvest = true end
+            if Config.AutoHarvestIgnited and string.find(rarityLower, "ignited") then shouldHarvest = true end
+
+            if shouldHarvest then
+                NetworkEngine:Fire("GardenHarvest", plant.Position or plant.Name)
+                NetworkEngine:Fire("HarvestPlant", plant.Name)
+                
+                if Config.AutoSellHarvested then
+                    task.wait(0.05)
+                    local fruitName = plant:GetAttribute("FruitName") or plant.Name
+                    NetworkEngine:Fire("SellItem", fruitName, 1)
+                    NetworkEngine:Fire("SellFruit", fruitName)
+                end
+                task.wait(0.02)
+            end
+        end
+    end
+
+    function AutomationCore:RunProcurementRoutine()
+        if Config.SeedShopAutoBuy then
+            NetworkEngine:PurchaseItem("Seed", Config.TargetSeedForAutoBuy, 1)
+        end
+
+        if Config.GearShopAutoBuy then
+            for _, gear in ipairs(Database.Gears) do
+                if gear[3] == "Super" or gear[3] == "Legendary" or gear[3] == "Epic" then
+                    NetworkEngine:PurchaseItem("Gear", gear[1])
+                end
+            end
+        end
+
+        if Config.EggShopAutoBuy then
+            NetworkEngine:PurchaseItem("Egg", Config.TargetEggForAutoBuy)
+        end
+        
+        if Config.CrateShopAutoBuy then
+             NetworkEngine:PurchaseItem("Crate", "Standard Crate")
+        end
+    end
+
+    function AutomationCore:RunPetAndWildRoutine()
+        if Config.AutoOpenEggs then
+            NetworkEngine:Fire("OpenEgg", Config.TargetEggForAutoBuy)
+            NetworkEngine:Fire("EggOpen", Config.TargetEggForAutoBuy)
+        end
+
+        if Config.AutoEquipBestPet then
+            NetworkEngine:Fire("PetRequestEquipByName", "Best")
+            NetworkEngine:Fire("EquipBestPets")
+        end
+
+        if Config.WildPetAutoTame then
+            local wildContainers = {
+                Workspace:FindFirstChild("WildPets"),
+                Workspace:FindFirstChild("WildPetSpawns"),
+                Workspace:FindFirstChild("Pets")
+            }
+
+            for _, container in ipairs(wildContainers) do
+                if container then
+                    for _, entity in ipairs(container:GetChildren()) do
+                        local isWild = entity:GetAttribute("Wild") or entity:GetAttribute("IsWild") or string.find(string.lower(entity.Name), "wild")
+                        if isWild and entity:IsA("Model") and entity:FindFirstChildWhichIsA("BasePart") then
+                            local char = LocalPlayer.Character
+                            if char and char:FindFirstChild("HumanoidRootPart") then
+                                local hrp = char.HumanoidRootPart
+                                local originalCFrame = hrp.CFrame
+                                
+                                -- Move to pet
+                                hrp.CFrame = entity:GetPivot() + Vector3.new(0, Config.FlyHeight or 2, 0)
+                                task.wait(0.1)
+                                
+                                -- Tame
+                                local petName = entity:GetAttribute("PetName") or entity.Name
+                                NetworkEngine:Fire("WildPetTame", petName)
+                                NetworkEngine:Fire("TamePet", petName)
+                                
+                                task.wait(0.1)
+                                -- Return
+                                hrp.CFrame = originalCFrame
+                                break -- Tame one at a time to prevent server rejection
+                            end
                         end
                     end
-                end)
+                end
             end
         end
-    end)
+    end
 
-    -- Loader Bypass Framework Loops
-    if Config.BypassGameplayPaused then
-        task.spawn(function()
-            local screenElement = CoreGui:FindFirstChild("GameplayPaused") or CoreGui:FindFirstChild("PausedScreen")
-            if screenElement then pcall(function() screenElement:Destroy() end) end
+    function AutomationCore:RunEconomyAndGuildRoutine()
+        if Config.AutoUseDailyDeals then
+            NetworkEngine:Fire("UseDailyDealSingle")
+            NetworkEngine:Fire("UseDailyDealAll")
+        end
+        
+        if Config.AutoUseDoubleOrNothing then
+            local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
+            local cash = leaderstats and (leaderstats:FindFirstChild("Cash") or leaderstats:FindFirstChild("Money"))
+            if cash and cash.Value >= Config.DoubleOrNothingThreshold then
+                NetworkEngine:Fire("DoubleOrNothing", math.floor(cash.Value * 0.1))
+            end
+        end
+        
+        if Config.GuildEnabled and Config.GuildAutoClaimRewards then
+            NetworkEngine:Fire("GuildClaimRewards")
+        end
+        
+        if Config.AutoSpendSkillPoints then
+             NetworkEngine:Fire("SpendSkillPoint", Config.SkillAllocationPriority)
+        end
+        
+        if Config.AutoClaimMail then
+            local success, mailList = NetworkEngine:Fire("MailboxList")
+            if success and mailList and type(mailList) == "table" then
+                for _, mail in ipairs(mailList) do
+                    local mailId = mail.id or mail.mailId
+                    if mailId then
+                        NetworkEngine:Fire("MailboxClaim", mailId)
+                    end
+                end
+            end
+        end
+    end
+
+    -- =====================================================================
+    -- SECTION 6: HIGH-PERFORMANCE ESP RENDERING ENGINE
+    -- =====================================================================
+    local EspEngine = {
+        Container = nil
+    }
+
+    function EspEngine:InitContainer()
+        if self.Container and self.Container.Parent then return end
+        
+        self.Container = Instance.new("ScreenGui")
+        self.Container.Name = "Omni_ESP_Container"
+        self.Container.ResetOnSpawn = false
+        self.Container.IgnoreGuiInset = true
+        
+        pcall(function() self.Container.Parent = CoreGui end)
+        if not self.Container.Parent then
+            self.Container.Parent = LocalPlayer:WaitForChild("PlayerGui")
+        end
+    end
+
+    function EspEngine:CreateVisual(target, text, color)
+        if not target or EngineState.VisualElementsESP[target] then return end
+        
+        local root = target:IsA("Model") and (target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")) or target
+        if not root or not root:IsA("BasePart") then return end
+
+        self:InitContainer()
+
+        local bb = Instance.new("BillboardGui")
+        bb.Name = "ESP_BB"
+        bb.Size = UDim2.new(0, 150, 0, 30)
+        bb.AlwaysOnTop = true
+        bb.Adornee = root
+        bb.Parent = self.Container
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, 0, 1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.RichText = true
+        lbl.Text = text
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextSize = 12
+        lbl.TextStrokeTransparency = 0.3
+        lbl.TextStrokeColor3 = Color3.new(0, 0, 0)
+        lbl.Parent = bb
+
+        local hl = Instance.new("Highlight")
+        hl.Name = "ESP_HL"
+        hl.Adornee = target
+        hl.FillColor = color
+        hl.FillTransparency = 0.6
+        hl.OutlineColor = Color3.new(1, 1, 1)
+        hl.OutlineTransparency = 0.2
+        hl.Parent = target
+
+        EngineState.VisualElementsESP[target] = {Billboard = bb, Highlight = hl}
+    end
+
+    function EspEngine:ClearVisuals()
+        for _, visual in pairs(EngineState.VisualElementsESP) do
+            if visual.Billboard then pcall(function() visual.Billboard:Destroy() end) end
+            if visual.Highlight then pcall(function() visual.Highlight:Destroy() end) end
+        end
+        table.clear(EngineState.VisualElementsESP)
+    end
+
+    function EspEngine:RenderLoop()
+        if not Config.ESPEnabled then
+            self:ClearVisuals()
+            return
+        end
+
+        self:InitContainer()
+
+        -- Cleanup Invalid/Destroyed Targets
+        for target, visual in pairs(EngineState.VisualElementsESP) do
+            if not target or not target.Parent or not target:IsDescendantOf(Workspace) then
+                if visual.Billboard then pcall(function() visual.Billboard:Destroy() end) end
+                if visual.Highlight then pcall(function() visual.Highlight:Destroy() end) end
+                EngineState.VisualElementsESP[target] = nil
+            end
+        end
+
+        -- Render Wild Pets
+        local petContainers = {Workspace:FindFirstChild("WildPets"), Workspace:FindFirstChild("Pets")}
+        for _, container in ipairs(petContainers) do
+            if container then
+                for _, pet in ipairs(container:GetChildren()) do
+                    if pet:IsA("Model") and not EngineState.VisualElementsESP[pet] then
+                        local isWild = pet:GetAttribute("Wild") or string.find(string.lower(pet.Name), "wild") or container.Name == "WildPets"
+                        if isWild then
+                            local petName = pet:GetAttribute("PetName") or pet.Name
+                            local nameLower = string.lower(string.gsub(petName, "%s+", ""))
+                            
+                            local allowRender = FilterESP.Pets["*"] or FilterESP.Pets[nameLower]
+                            
+                            if allowRender then
+                                local rarity = "Unknown"
+                                for _, dbPet in ipairs(Database.Pets) do
+                                    if string.lower(string.gsub(dbPet[2], "%s+", "")) == nameLower then
+                                        rarity = dbPet[3]
+                                        break
+                                    end
+                                end
+                                
+                                local hex = Database.RarityColors[rarity] or "#FFFFFF"
+                                local txt = string.format('<font color="%s">%s</font> <font color="%s">[%s]</font>', "#FFFFFF", petName, hex, rarity)
+                                self:CreateVisual(pet, txt, Color3.fromHex(string.gsub(hex, "#", "")))
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Render Fruits/Crops
+        if Config.ESPShowFruit then
+            local tycoon = AutomationCore:GetPlayerTycoon()
+            if tycoon then
+                local _, plants = AutomationCore:GetPlantsAndPlots(tycoon)
+                for _, plant in ipairs(plants) do
+                    if not EngineState.VisualElementsESP[plant] then
+                        local rarity = plant:GetAttribute("Rarity") or plant:GetAttribute("FruitRarity") or "Common"
+                        local isRare = rarity ~= "Common"
+                        
+                        if not Config.ESPShowRareFruitOnly or isRare then
+                            local hex = Database.RarityColors[rarity] or "#00FF00"
+                            local txt = string.format('<font color="%s">%s</font> <font color="%s">[%s]</font>', "#FFFFFF", plant.Name, hex, rarity)
+                            self:CreateVisual(plant, txt, Color3.fromHex(string.gsub(hex, "#", "")))
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- =====================================================================
+    -- SECTION 7: ADVANCED UI ENGINE & SHOP MULTI-SELECT SIDEBAR
+    -- =====================================================================
+    -- This section completely implements your requested Shop Sidebar using the 
+    -- compiled databases while integrating seamlessly with the main GUI.
+
+    local UIColors = {
+        BgMain = Color3.fromRGB(18, 20, 26),
+        BgSidebar = Color3.fromRGB(14, 15, 20),
+        BgCard = Color3.fromRGB(24, 26, 34),
+        BgInput = Color3.fromRGB(30, 32, 42),
+        AccentPrimary = Color3.fromRGB(0, 180, 255),
+        AccentSecondary = Color3.fromRGB(255, 60, 100),
+        AccentSuccess = Color3.fromRGB(0, 200, 100),
+        AccentWarning = Color3.fromRGB(255, 170, 0),
+        TextLight = Color3.fromRGB(240, 240, 245),
+        TextDim = Color3.fromRGB(140, 145, 160),
+        Border = Color3.fromRGB(40, 44, 58)
+    }
+
+    local UIEngine = {
+        ScreenGui = nil,
+        MainFrame = nil,
+        ShopFrame = nil,
+        Pages = {},
+        NavButtons = {}
+    }
+
+    function UIEngine:ApplyCorner(instance, radius)
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, radius or 8)
+        corner.Parent = instance
+        return corner
+    end
+
+    function UIEngine:ApplyStroke(instance, thickness, color)
+        local stroke = Instance.new("UIStroke")
+        stroke.Thickness = thickness or 1
+        stroke.Color = color or UIColors.Border
+        stroke.Parent = instance
+        return stroke
+    end
+
+    function UIEngine:MakeDraggable(topBar, mainBody)
+        local dragging, dragInput, dragStart, startPos
+        topBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = mainBody.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                end)
+            end
+        end)
+        topBar.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local delta = input.Position - dragStart
+                mainBody.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
         end)
     end
 
-    -- ===========================================================%
-    -- SECTION 4: DIAGNOSTIC REPORT MATRIX INITIALIZATION
-    -- ===========================================================%
-    print("=================================================================")
-    print("  GARDEN TYCOON — CONTROL SUITE BUILD v11.0 DEPLOYED COMPLETE   ")
-    print("  ZERO PLACEHOLDERS | COMPILED ADAPTIVE PARSING PIPELINES SUCCESS ")
-    print("=================================================================")
+    function UIEngine:InitializeBase()
+        if self.ScreenGui then pcall(function() self.ScreenGui:Destroy() end) end
+        
+        self.ScreenGui = Instance.new("ScreenGui")
+        self.ScreenGui.Name = "PremiumUI_Stable_V12"
+        self.ScreenGui.ResetOnSpawn = false
+        self.ScreenGui.IgnoreGuiInset = true
+        
+        pcall(function() self.ScreenGui.Parent = CoreGui end)
+        if not self.ScreenGui.Parent then self.ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+        -- Main Configuration Window
+        self.MainFrame = Instance.new("Frame")
+        self.MainFrame.Name = "OmniMainContainer"
+        self.MainFrame.Size = UDim2.new(0, 600, 0, 450)
+        self.MainFrame.Position = UDim2.new(0.5, -450, 0.5, -225)
+        self.MainFrame.BackgroundColor3 = UIColors.BgMain
+        self.MainFrame.BorderSizePixel = 0
+        self.MainFrame.ClipsDescendants = true
+        self.MainFrame.Parent = self.ScreenGui
+        self:ApplyCorner(self.MainFrame, 12)
+        self:ApplyStroke(self.MainFrame, 1)
+
+        -- Top Drag Bar
+        local topBar = Instance.new("Frame")
+        topBar.Size = UDim2.new(1, 0, 0, 40)
+        topBar.BackgroundColor3 = UIColors.BgSidebar
+        topBar.BorderSizePixel = 0
+        topBar.Parent = self.MainFrame
+        self:ApplyCorner(topBar, 12)
+        
+        -- Fix bottom corners of topbar
+        local fixBar = Instance.new("Frame")
+        fixBar.Size = UDim2.new(1, 0, 0, 20)
+        fixBar.Position = UDim2.new(0, 0, 1, -20)
+        fixBar.BackgroundColor3 = UIColors.BgSidebar
+        fixBar.BorderSizePixel = 0
+        fixBar.Parent = topBar
+
+        local titleText = Instance.new("TextLabel")
+        titleText.Size = UDim2.new(1, -20, 1, 0)
+        titleText.Position = UDim2.new(0, 20, 0, 0)
+        titleText.BackgroundTransparency = 1
+        titleText.Text = "OMNI MATRIX V12 : STABLE BUILD"
+        titleText.TextColor3 = UIColors.AccentPrimary
+        titleText.Font = Enum.Font.GothamBold
+        titleText.TextSize = 14
+        titleText.TextXAlignment = Enum.TextXAlignment.Left
+        titleText.Parent = topBar
+
+        self:MakeDraggable(topBar, self.MainFrame)
+
+        -- Sidebar Navigation
+        local navSidebar = Instance.new("Frame")
+        navSidebar.Size = UDim2.new(0, 160, 1, -40)
+        navSidebar.Position = UDim2.new(0, 0, 0, 40)
+        navSidebar.BackgroundColor3 = UIColors.BgSidebar
+        navSidebar.BorderSizePixel = 0
+        navSidebar.Parent = self.MainFrame
+        
+        local navLine = Instance.new("Frame")
+        navLine.Size = UDim2.new(0, 1, 1, 0)
+        navLine.Position = UDim2.new(1, 0, 0, 0)
+        navLine.BackgroundColor3 = UIColors.Border
+        navLine.BorderSizePixel = 0
+        navLine.Parent = navSidebar
+
+        local navScroll = Instance.new("ScrollingFrame")
+        navScroll.Size = UDim2.new(1, 0, 1, -10)
+        navScroll.Position = UDim2.new(0, 0, 0, 5)
+        navScroll.BackgroundTransparency = 1
+        navScroll.ScrollBarThickness = 0
+        navScroll.Parent = navSidebar
+
+        local navLayout = Instance.new("UIListLayout")
+        navLayout.Padding = UDim.new(0, 5)
+        navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        navLayout.Parent = navScroll
+
+        -- Page Container
+        local pageContainer = Instance.new("Frame")
+        pageContainer.Size = UDim2.new(1, -160, 1, -40)
+        pageContainer.Position = UDim2.new(0, 160, 0, 40)
+        pageContainer.BackgroundTransparency = 1
+        pageContainer.Parent = self.MainFrame
+
+        self.NavScroll = navScroll
+        self.PageContainer = pageContainer
+
+        -- ==============================================================
+        -- NEW FEATURE: SHOP MULTI-SELECT SIDEBAR (As requested)
+        -- ==============================================================
+        self:BuildShopSidebar()
+    end
+
+    function UIEngine:BuildShopSidebar()
+        EngineState.UI.ShopMultiSelect = {} -- Clear state
+
+        self.ShopFrame = Instance.new("Frame")
+        self.ShopFrame.Name = "AutoShopSidebar"
+        self.ShopFrame.Size = UDim2.new(0, 260, 0, 450)
+        self.ShopFrame.Position = UDim2.new(0.5, 170, 0.5, -225)
+        self.ShopFrame.BackgroundColor3 = UIColors.BgMain
+        self.ShopFrame.BorderSizePixel = 0
+        self.ShopFrame.Parent = self.ScreenGui
+        self:ApplyCorner(self.ShopFrame, 12)
+        self:ApplyStroke(self.ShopFrame, 1)
+
+        -- Shop Top Bar
+        local topBar = Instance.new("Frame")
+        topBar.Size = UDim2.new(1, 0, 0, 40)
+        topBar.BackgroundColor3 = UIColors.BgSidebar
+        topBar.BorderSizePixel = 0
+        topBar.Parent = self.ShopFrame
+        self:ApplyCorner(topBar, 12)
+        local fixBar = Instance.new("Frame")
+        fixBar.Size = UDim2.new(1, 0, 0, 20)
+        fixBar.Position = UDim2.new(0, 0, 1, -20)
+        fixBar.BackgroundColor3 = UIColors.BgSidebar
+        fixBar.BorderSizePixel = 0
+        fixBar.Parent = topBar
+
+        local titleText = Instance.new("TextLabel")
+        titleText.Size = UDim2.new(1, 0, 1, 0)
+        titleText.BackgroundTransparency = 1
+        titleText.Text = "🛒 MARKET TERMINAL"
+        titleText.TextColor3 = UIColors.AccentSuccess
+        titleText.Font = Enum.Font.GothamBold
+        titleText.TextSize = 14
+        titleText.Parent = topBar
+
+        self:MakeDraggable(topBar, self.ShopFrame)
+
+        -- Scrollable Multi-Select Area
+        local listScroll = Instance.new("ScrollingFrame")
+        listScroll.Size = UDim2.new(1, -20, 1, -110)
+        listScroll.Position = UDim2.new(0, 10, 0, 50)
+        listScroll.BackgroundColor3 = UIColors.BgCard
+        listScroll.ScrollBarThickness = 4
+        listScroll.ScrollBarImageColor3 = UIColors.AccentPrimary
+        listScroll.BorderSizePixel = 0
+        listScroll.Parent = self.ShopFrame
+        self:ApplyCorner(listScroll, 6)
+        self:ApplyStroke(listScroll, 1)
+
+        local listLayout = Instance.new("UIListLayout")
+        listLayout.Padding = UDim.new(0, 4)
+        listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        listLayout.Parent = listScroll
+
+        local listPadding = Instance.new("UIPadding")
+        listPadding.PaddingTop = UDim.new(0, 5)
+        listPadding.PaddingBottom = UDim.new(0, 5)
+        listPadding.Parent = listScroll
+
+        -- Populate Shop Items from compiled Databases
+        local shopItems = {}
+        for _, seed in ipairs(Database.Seeds) do table.insert(shopItems, {Name = seed[1], Type = "Seed", Cost = seed[2]}) end
+        for _, gear in ipairs(Database.Gears) do table.insert(shopItems, {Name = gear[1], Type = "Gear", Cost = gear[2]}) end
+        for _, mush in ipairs(Database.Mushrooms) do table.insert(shopItems, {Name = mush[1], Type = "Mushroom", Cost = mush[2]}) end
+
+        for i, itemData in ipairs(shopItems) do
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 28)
+            btn.BackgroundColor3 = UIColors.BgInput
+            btn.Text = "   " .. itemData.Name .. " ($" .. tostring(itemData.Cost) .. ")"
+            btn.TextColor3 = UIColors.TextDim
+            btn.Font = Enum.Font.GothamSemibold
+            btn.TextSize = 11
+            btn.TextXAlignment = Enum.TextXAlignment.Left
+            btn.TextTruncate = Enum.TextTruncate.AtEnd
+            btn.Parent = listScroll
+            self:ApplyCorner(btn, 4)
+
+            local checkIcon = Instance.new("TextLabel")
+            checkIcon.Size = UDim2.new(0, 20, 1, 0)
+            checkIcon.Position = UDim2.new(1, -25, 0, 0)
+            checkIcon.BackgroundTransparency = 1
+            checkIcon.Text = ""
+            checkIcon.TextColor3 = UIColors.AccentSuccess
+            checkIcon.Font = Enum.Font.GothamBold
+            checkIcon.TextSize = 14
+            checkIcon.Parent = btn
+
+            btn.MouseButton1Click:Connect(function()
+                if EngineState.UI.ShopMultiSelect[itemData.Name] then
+                    EngineState.UI.ShopMultiSelect[itemData.Name] = nil
+                    TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = UIColors.BgInput, TextColor3 = UIColors.TextDim}):Play()
+                    checkIcon.Text = ""
+                else
+                    EngineState.UI.ShopMultiSelect[itemData.Name] = itemData.Type
+                    TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = UIColors.Border, TextColor3 = UIColors.TextLight}):Play()
+                    checkIcon.Text = "✓"
+                end
+            end)
+        end
+        listScroll.CanvasSize = UDim2.new(0, 0, 0, #shopItems * 32 + 10)
+
+        -- Purchase Controls
+        local amountInput = Instance.new("TextBox")
+        amountInput.Size = UDim2.new(1, -20, 0, 26)
+        amountInput.Position = UDim2.new(0, 10, 1, -50)
+        amountInput.BackgroundColor3 = UIColors.BgInput
+        amountInput.Text = "1"
+        amountInput.PlaceholderText = "Quantity..."
+        amountInput.TextColor3 = UIColors.TextLight
+        amountInput.Font = Enum.Font.Gotham
+        amountInput.TextSize = 12
+        amountInput.Parent = self.ShopFrame
+        self:ApplyCorner(amountInput, 6)
+        self:ApplyStroke(amountInput, 1)
+
+        local buyBtn = Instance.new("TextButton")
+        buyBtn.Size = UDim2.new(1, -20, 0, 32)
+        buyBtn.Position = UDim2.new(0, 10, 1, -90)
+        buyBtn.BackgroundColor3 = UIColors.AccentWarning
+        buyBtn.Text = "EXECUTE BULK PURCHASE"
+        buyBtn.TextColor3 = Color3.new(1, 1, 1)
+        buyBtn.Font = Enum.Font.GothamBold
+        buyBtn.TextSize = 12
+        buyBtn.Parent = self.ShopFrame
+        self:ApplyCorner(buyBtn, 6)
+
+        buyBtn.MouseButton1Click:Connect(function()
+            local qty = tonumber(amountInput.Text) or 1
+            local count = 0
+            
+            buyBtn.Text = "PROCESSING..."
+            buyBtn.BackgroundColor3 = UIColors.Border
+
+            task.spawn(function()
+                for itemName, itemType in pairs(EngineState.UI.ShopMultiSelect) do
+                    count = count + 1
+                    LogVerbose("Executing auto-shop buy: " .. tostring(qty) .. "x " .. itemName .. " [" .. itemType .. "]")
+                    NetworkEngine:PurchaseItem(itemType, itemName, qty)
+                    task.wait(0.2) -- Safety delay between bulk remotes
+                end
+                
+                buyBtn.Text = "PURCHASE COMPLETE (" .. count .. " items)"
+                buyBtn.BackgroundColor3 = UIColors.AccentSuccess
+                task.wait(1.5)
+                buyBtn.Text = "EXECUTE BULK PURCHASE"
+                buyBtn.BackgroundColor3 = UIColors.AccentWarning
+            end)
+        end)
+    end
+
+    function UIEngine:AddPage(title, icon)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -20, 0, 35)
+        btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
+        btn.BackgroundTransparency = 1
+        btn.Text = "   " .. (icon or "") .. "  " .. title
+        btn.TextColor3 = UIColors.TextDim
+        btn.Font = Enum.Font.GothamSemibold
+        btn.TextSize = 12
+        btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.Parent = self.NavScroll
+        self:ApplyCorner(btn, 8)
+
+        local page = Instance.new("ScrollingFrame")
+        page.Size = UDim2.new(1, 0, 1, 0)
+        page.BackgroundTransparency = 1
+        page.ScrollBarThickness = 3
+        page.ScrollBarImageColor3 = UIColors.AccentPrimary
+        page.Visible = false
+        page.Parent = self.PageContainer
+
+        local layout = Instance.new("UIListLayout")
+        layout.Padding = UDim.new(0, 8)
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        layout.Parent = page
+
+        local padding = Instance.new("UIPadding")
+        padding.PaddingTop = UDim.new(0, 10)
+        padding.PaddingBottom = UDim.new(0, 10)
+        padding.Parent = page
+
+        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+        end)
+
+        btn.MouseButton1Click:Connect(function()
+            for _, p in ipairs(self.Pages) do p.Page.Visible = false end
+            for _, b in ipairs(self.NavButtons) do
+                TweenService:Create(b, TweenInfo.new(0.2), {TextColor3 = UIColors.TextDim, BackgroundTransparency = 1}):Play()
+            end
+            page.Visible = true
+            TweenService:Create(btn, TweenInfo.new(0.2), {TextColor3 = UIColors.TextLight, BackgroundTransparency = 0.8}):Play()
+        end)
+
+        table.insert(self.Pages, {Page = page, Title = title})
+        table.insert(self.NavButtons, btn)
+
+        if #self.Pages == 1 then
+            page.Visible = true
+            btn.TextColor3 = UIColors.TextLight
+            btn.BackgroundTransparency = 0.8
+        end
+
+        return page
+    end
+
+    function UIEngine:AddSection(page, title)
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, -20, 0, 25)
+        frame.BackgroundTransparency = 1
+        frame.Parent = page
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = string.upper(title)
+        label.TextColor3 = UIColors.AccentPrimary
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 11
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = frame
+
+        local line = Instance.new("Frame")
+        line.Size = UDim2.new(1, -(label.TextBounds.X + 15), 0, 1)
+        line.Position = UDim2.new(0, label.TextBounds.X + 10, 0.5, 0)
+        line.BackgroundColor3 = UIColors.Border
+        line.BorderSizePixel = 0
+        line.Parent = frame
+    end
+
+    function UIEngine:AddToggle(page, configKey, title, desc)
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, -20, 0, 50)
+        frame.BackgroundColor3 = UIColors.BgCard
+        frame.Parent = page
+        self:ApplyCorner(frame, 8)
+        self:ApplyStroke(frame, 1)
+
+        local lblTitle = Instance.new("TextLabel")
+        lblTitle.Size = UDim2.new(1, -70, 0, 20)
+        lblTitle.Position = UDim2.new(0, 15, 0, 6)
+        lblTitle.BackgroundTransparency = 1
+        lblTitle.Text = title
+        lblTitle.TextColor3 = UIColors.TextLight
+        lblTitle.Font = Enum.Font.GothamSemibold
+        lblTitle.TextSize = 12
+        lblTitle.TextXAlignment = Enum.TextXAlignment.Left
+        lblTitle.Parent = frame
+
+        local lblDesc = Instance.new("TextLabel")
+        lblDesc.Size = UDim2.new(1, -70, 0, 15)
+        lblDesc.Position = UDim2.new(0, 15, 0, 26)
+        lblDesc.BackgroundTransparency = 1
+        lblDesc.Text = desc or ""
+        lblDesc.TextColor3 = UIColors.TextDim
+        lblDesc.Font = Enum.Font.Gotham
+        lblDesc.TextSize = 10
+        lblDesc.TextXAlignment = Enum.TextXAlignment.Left
+        lblDesc.Parent = frame
+
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 44, 0, 22)
+        btn.Position = UDim2.new(1, -55, 0.5, -11)
+        btn.BackgroundColor3 = Config[configKey] and UIColors.AccentSuccess or UIColors.BgInput
+        btn.Text = ""
+        btn.Parent = frame
+        self:ApplyCorner(btn, 11)
+
+        local knob = Instance.new("Frame")
+        knob.Size = UDim2.new(0, 16, 0, 16)
+        knob.Position = Config[configKey] and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+        knob.BackgroundColor3 = Color3.new(1, 1, 1)
+        knob.Parent = btn
+        self:ApplyCorner(knob, 8)
+
+        btn.MouseButton1Click:Connect(function()
+            Config[configKey] = not Config[configKey]
+            local on = Config[configKey]
+            
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = on and UIColors.AccentSuccess or UIColors.BgInput}):Play()
+            TweenService:Create(knob, TweenInfo.new(0.2), {Position = on and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)}):Play()
+            
+            if EngineState.UI.ToggleRegistry[configKey] then
+                pcall(function() EngineState.UI.ToggleRegistry[configKey](on) end)
+            end
+        end)
+    end
+
+    function UIEngine:AddDropdown(page, configKey, title, options)
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, -20, 0, 45)
+        frame.BackgroundColor3 = UIColors.BgCard
+        frame.Parent = page
+        self:ApplyCorner(frame, 8)
+        self:ApplyStroke(frame, 1)
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(0.5, 0, 1, 0)
+        lbl.Position = UDim2.new(0, 15, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = title
+        lbl.TextColor3 = UIColors.TextLight
+        lbl.Font = Enum.Font.GothamSemibold
+        lbl.TextSize = 12
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = frame
+
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 150, 0, 26)
+        btn.Position = UDim2.new(1, -165, 0.5, -13)
+        btn.BackgroundColor3 = UIColors.BgInput
+        btn.Text = tostring(Config[configKey]) .. "  ▼"
+        btn.TextColor3 = UIColors.TextDim
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 11
+        btn.Parent = frame
+        self:ApplyCorner(btn, 6)
+
+        btn.MouseButton1Click:Connect(function()
+            local idx = 1
+            for i, v in ipairs(options) do
+                if v == Config[configKey] then
+                    idx = (i % #options) + 1
+                    break
+                end
+            end
+            local val = options[idx]
+            Config[configKey] = val
+            btn.Text = tostring(val) .. "  ▼"
+            
+            if configKey == "ESPSelectedPets" then
+                UpdateESPCache("Pets", val)
+            end
+        end)
+    end
+
+    -- =====================================================================
+    -- SECTION 8: LAUNCH & ASSEMBLE ARCHITECTURE
+    -- =====================================================================
+    UIEngine:InitializeBase()
+
+    local pAuto = UIEngine:AddPage("Automation", "⚙️")
+    local pFarm = UIEngine:AddPage("Farming", "🌾")
+    local pESP  = UIEngine:AddPage("Visuals", "👁️")
+    local pUtil = UIEngine:AddPage("Utilities", "🛠️")
+
+    -- Populate Automation
+    UIEngine:AddSection(pAuto, "Market Operations")
+    UIEngine:AddToggle(pAuto, "SeedShopAutoBuy", "Auto-Buy Target Seed", "Continuously purchase the selected seed type.")
+    UIEngine:AddDropdown(pAuto, "TargetSeedForAutoBuy", "Target Seed", {"Carrot", "Strawberry", "Tomato", "Mango", "Watermelon"})
+    UIEngine:AddToggle(pAuto, "GearShopAutoBuy", "Auto-Buy High Tier Gear", "Automatically buys Legendary/Epic/Super tools.")
     
-    -- Select the default landing module deck
-    tabModules["Dashboard"].Button.BackgroundTransparency = 0
-    tabModules["Dashboard"].Button.BackgroundColor3 = Color3.fromRGB(28, 35, 45)
-    tabModules["Dashboard"].Button.TextColor3 = Color3.fromRGB(0, 180, 255)
-    tabModules["Dashboard"].Page.Visible = true
-    activeTab = "Dashboard"
+    UIEngine:AddSection(pAuto, "Pet Incubation")
+    UIEngine:AddToggle(pAuto, "AutoOpenEggs", "Auto Crack Eggs", "Continuously purchase and open target eggs.")
+    UIEngine:AddToggle(pAuto, "WildPetAutoTame", "Auto Tame Wild Pets", "Teleports to and tames spawned wild pets instantly.")
+
+    -- Populate Farming
+    UIEngine:AddSection(pFarm, "Plot Management")
+    UIEngine:AddToggle(pFarm, "AutoPlantEnabled", "Auto Plant Seeds", "Plants configured seeds in empty dirt plots.")
+    UIEngine:AddToggle(pFarm, "AutoWaterEnabled", "Auto Water Plots", "Keeps plot moisture levels optimal.")
+    
+    UIEngine:AddSection(pFarm, "Extraction Logistics")
+    UIEngine:AddToggle(pFarm, "AutoHarvestMature", "Harvest Mature", "Extracts standard crops when fully grown.")
+    UIEngine:AddToggle(pFarm, "AutoHarvestElectric", "Harvest Electric", "Extracts lightning mutated elements.")
+    UIEngine:AddToggle(pFarm, "AutoSellHarvested", "Auto Sell Crops", "Liquidates harvested materials to the market.")
+
+    -- Populate Visuals
+    UIEngine:AddSection(pESP, "Sensory Overlays")
+    UIEngine:AddToggle(pESP, "ESPEnabled", "Enable ESP Matrix", "Renders 3D bounding boxes and text over entities.")
+    UIEngine:AddToggle(pESP, "ESPShowFruit", "Show Rare Crops", "Highlights rare/mutated crops in your garden.")
+    UIEngine:AddDropdown(pESP, "ESPSelectedPets", "Target Pet ESP", {"All", "IceSerpent", "BlackDragon", "Unicorn"})
+
+    -- Populate Utilities
+    UIEngine:AddSection(pUtil, "Environment Optimization")
+    UIEngine:AddToggle(pUtil, "FullBright", "Fullbright Mode", "Removes shadows and maxes ambient lighting.")
+    UIEngine:AddToggle(pUtil, "InfiniteZoom", "Infinite Zoom", "Removes camera max zoom distance cap.")
+    UIEngine:AddToggle(pUtil, "AutoReduceLag", "FPS Optimizer", "Removes lag-inducing particle effects globally.")
+
+    -- Start Core Engine Loops
+    task.spawn(function()
+        while true do
+            task.wait(EngineState.LoopIntervals.medium)
+            RunProtectedBlock(function() AutomationCore:RunAgricultureRoutine() end, "Agriculture")
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            task.wait(EngineState.LoopIntervals.slow)
+            RunProtectedBlock(function() AutomationCore:RunProcurementRoutine() end, "Procurement")
+            RunProtectedBlock(function() AutomationCore:RunEconomyAndGuildRoutine() end, "Economy")
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            task.wait(EngineState.LoopIntervals.medium)
+            RunProtectedBlock(function() AutomationCore:RunPetAndWildRoutine() end, "Pets/Wild")
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            task.wait(EngineState.LoopIntervals.fast)
+            RunProtectedBlock(function() EspEngine:RenderLoop() end, "ESP")
+        end
+    end)
+
+    -- Legacy Inject Custom Buttons from original script config
+    pcall(function()
+        local tBtn = Instance.new("TextButton")
+        tBtn.Size = UDim2.new(1, 0, 0, 35)
+        tBtn.Font = Enum.Font.Code
+        tBtn.TextSize = 14
+        
+        local bCont = Instance.new("Frame")
+        bCont.Size = UDim2.new(0, 120, 0, 100)
+        bCont.Position = UDim2.new(0, 10, 0.5, -50)
+        bCont.BackgroundTransparency = 1
+        bCont.Parent = UIEngine.ScreenGui
+        
+        local layout = Instance.new("UIListLayout")
+        layout.Parent = bCont
+        layout.Padding = UDim.new(0, 5)
+
+        local function mkBtn(name, txt, color, target)
+            local b = tBtn:Clone()
+            b.Name = name
+            b.Text = txt
+            b.BackgroundColor3 = color
+            b.TextColor3 = Color3.new(1,1,1)
+            b.MouseButton1Click:Connect(function()
+                local t = Workspace:FindFirstChild(target)
+                if t and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    LocalPlayer.Character.HumanoidRootPart.CFrame = t.CFrame + Vector3.new(0,3,0)
+                end
+            end)
+            b.Parent = bCont
+        end
+        mkBtn("GearsBtn", "Teleport Gears", Color3.fromRGB(0, 170, 255), "GearsSpawn")
+        mkBtn("PropsBtn", "Teleport Props", Color3.fromRGB(255, 170, 0), "PropsSpawn")
+    end)
+
+    LogVerbose("Omni-Recon Matrix Boot Sequence Complete.")
 end
 
--- Execute the entire production architecture control matrix safely
-pcall(MainControlSuite)
+-- Fire execution
+pcall(__MATRIX_EXECUTE__)
