@@ -109,7 +109,9 @@ local Database = {
     {"Raccoon", "Super ($5M)"},
     {"Bear", "Mythic ($5M)"},
     {"Black Dragon", "BlackDragon", "Super ($20M)"},
-    {"Ice Serpent", "IceSerpent", "Super ($20M)"}
+    {"Ice Serpent", "IceSerpent", "Super ($20M)"},
+    {"Butterfly", "Legendary ($15M)"},
+    {"Bald Eagle", "BaldEagle", "Mythic ($25M)"}
 }
 
 -- Hex Color Matrix map for RichText formatting base on rarity
@@ -669,7 +671,7 @@ task.spawn(function()
 end)
 
 task.spawn(function()
-    while task.wait(0.2) do
+    while task.wait(0.5) do
         if Config.SkipLoadingScreen then
             pcall(function()
                 local camera = workspace.CurrentCamera
@@ -1783,7 +1785,7 @@ end, "BypassGameplayPaused")
 
 ViewCreator.AddSectionHeader(MiscScroll, "ESP Spawned Pets")
 
-local petOptions = {"None", "Raccoon", "Robin", "Frog", "Bunny", "Deer", "Owl", "Bee", "Unicorn", "GoldenDragonfly", "IceSerpent"}
+local petOptions = {"None", "Raccoon", "Robin", "Frog", "Bunny", "Deer", "Owl", "Bee", "Unicorn", "GoldenDragonfly", "IceSerpent", "Butterfly", "BaldEagle"}
 local rarityOptions = {"None", "Epic", "Legendary", "Mythic", "Super", "Rare", "Uncommon", "Common"}
 local sizeOptions = {"None", "Big", "Huge"}
 
