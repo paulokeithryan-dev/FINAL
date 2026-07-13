@@ -4,20 +4,29 @@
 -- =====================================================================
 
 
--- FINAL AUTO-SKIP: BOTTOM-LEFT (SAFE ZONE)
+-- MOBILE AUTO-SKIP: TOUCH-TO-STOP VERSION
 task.spawn(function()
     local Players = game:GetService("Players")
     local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+    local UserInputService = game:GetService("UserInputService")
     
-    -- Bottom-Left Coordinates
+    local shouldStop = false
+
+    -- 1. KILL SWITCH: Listen for ANY touch/input
+    UserInputService.InputBegan:Connect(function()
+        shouldStop = true
+    end)
+
+    -- Target coordinates (Bottom-Left)
     local viewport = workspace.CurrentCamera.ViewportSize
     local x = 50
-    local y = viewport.Y - 50 -- This calculates the bottom edge
+    local y = viewport.Y - 50
 
-    while true do
+    -- 2. LOOP
+    while not shouldStop do
         local found = false
         
-        -- Scan for the "Click to skip!" text
+        -- Scan for the label
         for _, obj in pairs(PlayerGui:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(obj.Text, "Click to skip!") then
                 if obj.Visible and obj.Parent and obj.Parent.Visible then
@@ -27,7 +36,6 @@ task.spawn(function()
         end
 
         if found then
-            -- Move visual cursor to bottom-left and click
             if mousemoveabs then
                 mousemoveabs(x, y)
             end
@@ -36,10 +44,12 @@ task.spawn(function()
             end
             task.wait(0.5)
         else
-            -- Loading screen is gone, script stops completely
+            -- Loading screen is gone naturally
             break 
         end
     end
+    
+    print("Auto-clicker stopped by touch or screen removal.")
 end)
 
 
