@@ -4,61 +4,46 @@
 -- =====================================================================
 
 
--- AUTO-SKIP CLICKER: BOTTOM-LEFT TARGETING
-
+-- AUTO-SKIP CLICKER: ROBUST STOP-LOGIC
 task.spawn(function()
-
     local VirtualInputManager = game:GetService("VirtualInputManager")
-
     local Players = game:GetService("Players")
-
     local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
+    -- Define the container you found in your explorer
+    -- Replace "LoadingScreen" with the EXACT name of the folder that holds the UI
+    local loadingFolder = PlayerGui:FindFirstChild("LoadingScreen") 
 
-
-    local function isSkipVisible()
-
-        for _, obj in pairs(PlayerGui:GetDescendants()) do
-
+    local function shouldClick()
+        if not loadingFolder then return false end
+        
+        -- Check if the folder is still enabled and its main GUI is visible
+        if loadingFolder.Enabled == false then return false end
+        
+        -- Double check the specific label you were looking for
+        for _, obj in pairs(loadingFolder:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(obj.Text, "Click to skip!") then
-
                 return obj.Visible
-
             end
-
         end
-
         return false
-
     end
 
-
-
-    while isSkipVisible() do
-
+    while shouldClick() do
         local viewport = workspace.CurrentCamera.ViewportSize
-
-        -- Bottom-Left positioning
-
         local x = 50
-
         local y = viewport.Y - 50
-
         
-
+        -- Move visual cursor if executor allows
+        if mousemoveabs then mousemoveabs(x, y) end
+        
+        -- Send click
         VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-
         VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-
         
-
         task.wait(0.5)
-
     end
-
-end) 
-
-
+end)
 
 
 
