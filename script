@@ -191,8 +191,24 @@ local function executeInterceptionManeuver(thiefRoot, petRoot)
         task.wait(0.02) 
     end
     
-    local strikePosition = thiefRoot.CFrame * CFrame.new(0, 0, 1.2)
-    smoothFlyTo(strikePosition, Config.CombatDashSpeed)
+    -- Calculate optimal strike distance and direction
+    local strikeDistance = 3
+    local direction = (rootPart.Position - thiefRoot.Position).Unit
+    
+    -- Fallback in case of exact overlapping positions (prevents NaN math errors)
+    if direction.Magnitude ~= direction.Magnitude then
+        direction = Vector3.new(1, 0, 0)
+    end
+    
+    -- Flatten the Y axis so your character doesn't tilt awkwardly up or down
+    local flatThiefPos = Vector3.new(thiefRoot.Position.X, rootPart.Position.Y, thiefRoot.Position.Z)
+    local standPos = flatThiefPos + (direction * strikeDistance)
+    
+    -- Force character to look directly at the thief's coordinate
+    local strikeCFrame = CFrame.lookAt(standPos, flatThiefPos)
+    
+    -- Execute combat dash
+    smoothFlyTo(strikeCFrame, Config.CombatDashSpeed)
     
     if shovel and Config.PetHuntEnabled then
         for i = 1, 10 do
