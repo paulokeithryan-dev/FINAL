@@ -1,6 +1,6 @@
 -- =====================================================================
 -- PREMIUM UI ENGINE - VERSION 6.2 (STABLE MOVEMENT MASTER ENGINE)
--- OPTIMIZED & BUG-FIXED RECON EDITION (RAYFIELD PORT)
+-- OPTIMIZED & BUG-FIXED RECON EDITION (RAYFIELD PORT - MINIMAL)
 -- =====================================================================
 
 -- Global Configuration Matrix
@@ -897,7 +897,7 @@ local Window = Rayfield:CreateWindow({
     LoadingTitle = "Pet Hunter Engine",
     LoadingSubtitle = "by Recon",
     ConfigurationSaving = {
-        Enabled = false, -- We utilize the robust custom JSON manager 
+        Enabled = false, 
     },
     Discord = {
         Enabled = false,
@@ -905,10 +905,10 @@ local Window = Rayfield:CreateWindow({
     KeySystem = false
 })
 
-local HuntTab = Window:CreateTab("Pet Hunter", "paw")
-local MiscTab = Window:CreateTab("Misc", "settings")
-local SettingsTab = Window:CreateTab("Settings", "wrench")
-local ConfigTab = Window:CreateTab("Configs", "save")
+local HuntTab = Window:CreateTab("Pet Hunter", nil)
+local MiscTab = Window:CreateTab("Misc", nil)
+local SettingsTab = Window:CreateTab("Settings", nil)
+local ConfigTab = Window:CreateTab("Configs", nil)
 
 -- ==========================================
 -- TAB 1: PET HUNTER ENGINE CONFIGURATION
@@ -916,7 +916,7 @@ local ConfigTab = Window:CreateTab("Configs", "save")
 HuntTab:CreateSection("Wild Pet")
 
 RayfieldElements["PetHuntEnabled"] = HuntTab:CreateToggle({
-    Name = "⭐ ENABLE AUTO PET HUNT",
+    Name = "Enable Auto Pet Hunt",
     CurrentValue = Config.PetHuntEnabled,
     Flag = "PetHuntEnabled",
     Callback = function(Value)
@@ -929,7 +929,7 @@ RayfieldElements["PetHuntEnabled"] = HuntTab:CreateToggle({
 })
 
 RayfieldElements["ProtectionEnabled"] = HuntTab:CreateToggle({
-    Name = "🛡️ PET PURCHASE PROTECTION",
+    Name = "Pet Purchase Protection",
     CurrentValue = Config.ProtectionEnabled,
     Flag = "ProtectionEnabled",
     Callback = function(Value)
@@ -966,7 +966,7 @@ end
 
 HuntTab:CreateSection("Pet Finder")
 RayfieldElements["ServerHopEnabled"] = HuntTab:CreateToggle({
-    Name = "🔄 Enable Automated Server Hopping",
+    Name = "Enable Automated Server Hopping",
     CurrentValue = Config.ServerHopEnabled,
     Flag = "ServerHopEnabled",
     Callback = function(Value)
@@ -1005,7 +1005,7 @@ MiscTab:CreateButton({
 })
 
 RayfieldElements["AutoRemoveOtherGardens"] = MiscTab:CreateToggle({
-    Name = "Auto Remove Other Gardens (Loop)",
+    Name = "Auto Remove Other Gardens",
     CurrentValue = Config.AutoRemoveOtherGardens,
     Flag = "AutoRemoveOtherGardens",
     Callback = function(Value)
@@ -1023,7 +1023,7 @@ MiscTab:CreateButton({
 })
 
 RayfieldElements["AutoReduceLag"] = MiscTab:CreateToggle({
-    Name = "Auto Reduce Lag (Loop)",
+    Name = "Auto Reduce Lag",
     CurrentValue = Config.AutoReduceLag,
     Flag = "AutoReduceLag",
     Callback = function(Value)
@@ -1115,7 +1115,7 @@ RayfieldElements["ESPSelectedPets"] = MiscTab:CreateDropdown({
 })
 
 RayfieldElements["ESPSelectedRarities"] = MiscTab:CreateDropdown({
-    Name = "Select Rarity Pets",
+    Name = "Select Rarity",
     Options = rarityOptions,
     CurrentOption = {"None"},
     MultipleOptions = true,
@@ -1128,7 +1128,7 @@ RayfieldElements["ESPSelectedRarities"] = MiscTab:CreateDropdown({
 })
 
 RayfieldElements["ESPSelectedSizes"] = MiscTab:CreateDropdown({
-    Name = "Select Size Pets",
+    Name = "Select Size",
     Options = sizeOptions,
     CurrentOption = {"None"},
     MultipleOptions = true,
@@ -1200,7 +1200,7 @@ RayfieldElements["CombatDashSpeed"] = SettingsTab:CreateInput({
 SettingsTab:CreateSection("Interface & Gameplay Bypasses")
 
 RayfieldElements["SkipLoadingScreen"] = SettingsTab:CreateToggle({
-    Name = "⚡ INSTANT SKIP LOADING SCREEN",
+    Name = "Instant Skip Loading Screen",
     CurrentValue = Config.SkipLoadingScreen,
     Flag = "SkipLoadingScreen",
     Callback = function(Value)
@@ -1212,14 +1212,14 @@ RayfieldElements["SkipLoadingScreen"] = SettingsTab:CreateToggle({
 -- TAB 4: CONFIGURATION (JSON)
 -- ==========================================
 ConfigTab:CreateButton({
-    Name = "💾 Save Current System Settings",
+    Name = "Save Current System Settings",
     Callback = function()
         saveConfig()
     end,
 })
 
 ConfigTab:CreateButton({
-    Name = "📂 Load Configuration History",
+    Name = "Load Configuration History",
     Callback = function()
         loadConfig()
     end,
