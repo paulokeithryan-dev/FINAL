@@ -4,25 +4,37 @@
 -- =====================================================================
 
 
--- UNIVERSAL AUTO-SKIP: PC & MOBILE STABLE
+-- UNIVERSAL AUTO-SKIP: PC & MOBILE STABLE (WITH NOTIFICATION)
 task.spawn(function()
     local Players = game:GetService("Players")
     local UserInputService = game:GetService("UserInputService")
     local VirtualInputManager = game:GetService("VirtualInputManager")
     local LocalPlayer = Players.LocalPlayer
     
+    -- 1. Notify the user that the script is active
+    local notifyTitle = "Auto-Skip Active"
+    local notifyContent = "Press 'X' (PC) or Touch Screen (Mobile) to stop!"
+    
+    -- Attempt to use Rayfield notification, fallback to warn if UI isn't loaded yet
+    if getgenv and getgenv().Rayfield then
+        getgenv().Rayfield:Notify({
+            Title = notifyTitle,
+            Content = notifyContent,
+            Duration = 5,
+        })
+    end
+    warn("[INFO]: " .. notifyTitle .. " - " .. notifyContent)
+
     local shouldStop = false
 
-    -- UNIVERSAL KILL SWITCH: Triggers on Keyboard (PC) or Touch (Mobile)
+    -- 2. UNIVERSAL KILL SWITCH
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        -- Pressing 'X' (PC) or touching screen (Mobile) stops the script
         if input.KeyCode == Enum.KeyCode.X or input.UserInputType == Enum.UserInputType.Touch then
             shouldStop = true
             print("Interrupt detected! Stopping auto-clicker...")
         end
     end)
 
-    -- Define the Click Position (Bottom-Left)
     local x = 50
     local y = workspace.CurrentCamera.ViewportSize.Y - 50
 
@@ -30,13 +42,10 @@ task.spawn(function()
         local found = false
         local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
         
-        -- Scan for the button
         for _, obj in pairs(PlayerGui:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(obj.Text, "Click to skip!") then
-                -- Check if it is truly visible and inside a ScreenGui
                 if obj.Visible and obj.Parent and obj.Parent.Visible then
                     found = true
-                    -- Stable Click Method: VirtualInputManager
                     VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
                     task.wait(0.05)
                     VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
@@ -45,7 +54,6 @@ task.spawn(function()
         end
 
         if not found then
-            -- If we didn't find the text, maybe it's gone. Check for 2 seconds before breaking.
             task.wait(2) 
             break
         end
