@@ -4,51 +4,40 @@
 -- =====================================================================
 
 
--- AUTO-SKIP CLICKER: VISIBLE CURSOR & STRICT UI CHECK
+-- RAW CURSOR AUTO-SKIP: BOTTOM-LEFT TARGETING
 task.spawn(function()
     local Players = game:GetService("Players")
     local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-    local RunService = game:GetService("RunService")
 
-    -- Define the click target (Bottom-Left)
+    -- Define target
     local viewport = workspace.CurrentCamera.ViewportSize
-    local x, y = 50, viewport.Y - 50
+    local x = 50
+    local y = viewport.Y - 50
 
-    local function shouldClick()
-        -- 1. Scan for the specific label
+    local function isSkipVisible()
+        -- Scan all GUI elements for the specific label
         for _, obj in pairs(PlayerGui:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(obj.Text, "Click to skip!") then
-                -- 2. CRITICAL: Check if it's actually visible AND its parent is active
-                -- If the parent is hidden, the label is effectively gone
-                if obj.Visible and obj.Parent and obj.Parent.Visible then
-                    return true
-                end
+                -- Only return true if the label is ACTUALLY visible
+                return obj.Visible
             end
         end
         return false
     end
 
-    while true do
-        -- Check if we should still be clicking
-        if not shouldClick() then
-            break -- Exit the loop immediately when text is gone
-        end
-
-        -- Move the visual cursor
+    while isSkipVisible() do
+        -- 1. Physically move the raw cursor to the target
         if mousemoveabs then
             mousemoveabs(x, y)
         end
         
-        -- Perform click
+        -- 2. Physically trigger the hardware click
         if mouse1click then
             mouse1click()
         end
-
-        -- Wait 1 second to give your joystick priority
-        task.wait(1) 
+        
+        task.wait(0.5) -- Adjust this delay to let your joystick have space
     end
-    
-    print("Loading screen skipped. Auto-clicker disabled.")
 end)
 
 
