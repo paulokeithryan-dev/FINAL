@@ -3,6 +3,26 @@
 -- OPTIMIZED & BUG-FIXED RECON EDITION (RAYFIELD PORT - MINIMAL)
 -- =====================================================================
 
+
+
+-- INSTANT LOADING SCREEN BYPASS
+task.spawn(function()
+    local ReplicatedFirst = game:GetService("ReplicatedFirst")
+    local loadingMenu = ReplicatedFirst:FindFirstChild("LoadingScreenMenu")
+    
+    if loadingMenu then
+        -- This disables the UI if it's a ScreenGui or similar
+        if loadingMenu:IsA("GuiObject") or loadingMenu:IsA("ScreenGui") then
+            loadingMenu.Enabled = false
+        end
+        -- Alternatively, if it's a script/folder controlling it, you can destroy it
+        loadingMenu:Destroy()
+    end
+end)
+
+
+
+
 -- Global Configuration Matrix
 local Config = {
     -- INTERCEPTION SETTINGS
