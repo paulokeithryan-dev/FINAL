@@ -4,49 +4,62 @@
 -- =====================================================================
 
 
+-- AUTO-SKIP CLICKER: BOTTOM-LEFT TARGETING
 
--- AUTO-SKIP: OPTIMIZED FOR JOYSTICK COMPATIBILITY
 task.spawn(function()
+
     local VirtualInputManager = game:GetService("VirtualInputManager")
+
     local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-    -- Define the specific UI object path if possible (much faster than searching all descendants)
-    -- If your UI is named "LoadingScreen", this is more efficient:
-    local loadingScreen = PlayerGui:WaitForChild("LoadingScreen", 5)
+    local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-    -- Function to check if the specific "Click to skip!" label is visible
+
+
     local function isSkipVisible()
-        if not loadingScreen or not loadingScreen.Enabled then return false end
-        
-        -- Use a targeted search within the loading screen only
-        local skipLabel = loadingScreen:FindFirstChild("ClickToSkipLabel", true) -- Change to exact name
-        if skipLabel and skipLabel:IsA("TextLabel") then
-            return skipLabel.Visible
+
+        for _, obj in pairs(PlayerGui:GetDescendants()) do
+
+            if obj:IsA("TextLabel") and string.find(obj.Text, "Click to skip!") then
+
+                return obj.Visible
+
+            end
+
         end
+
         return false
+
     end
 
-    -- Loop runs ONLY while the screen is detected
-    while true do
-        -- Check if the screen is still there; if not, break the loop immediately
-        if not PlayerGui:FindFirstChild("LoadingScreen") then
-            break 
-        end
+
+
+    while isSkipVisible() do
 
         local viewport = workspace.CurrentCamera.ViewportSize
+
+        -- Bottom-Left positioning
+
         local x = 50
+
         local y = viewport.Y - 50
+
         
-        -- Send the click
+
         VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+
         VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+
         
-        -- Increase wait time slightly to give your joystick input priority
-        task.wait(1.0) 
+
+        task.wait(0.5)
+
     end
-end)
+
+end) 
+
+
+
 
 
 -- Global Configuration Matrix
