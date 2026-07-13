@@ -21,6 +21,7 @@ local Config = {
         ["Monkey"] = false,
         ["Unicorn"] = false,
         ["GoldenDragonfly"] = false,
+        ["Firefly"] = false,
         ["Bear"] = false,
         ["BlackDragon"] = false,
         ["IceSerpent"] = false,
@@ -105,13 +106,14 @@ local Database = {
     {"Bee", "Legendary ($1M)"},
     {"Monkey", "Mythic ($1M)"},
     {"Golden Dragonfly", "GoldenDragonfly", "Mythic ($3M)"},
+    {"Firefly", "Mythic ($3M)"},
     {"Unicorn", "Mythic ($4M)"},
     {"Raccoon", "Super ($5M)"},
     {"Bear", "Mythic ($5M)"},
     {"Black Dragon", "BlackDragon", "Super ($20M)"},
     {"Ice Serpent", "IceSerpent", "Super ($20M)"},
-    {"Butterfly", "Legendary ($15M)"},
-    {"Bald Eagle", "BaldEagle", "Mythic ($25M)"}
+    {"Butterfly", "Legendary ($1M)"},
+    {"Bald Eagle", "BaldEagle", "Mythic ($5M)"}
 }
 
 -- Hex Color Matrix map for RichText formatting base on rarity
@@ -746,11 +748,7 @@ task.spawn(function()
     
     local walkWaypoints = {}
     local currentWPIndex = 1
-    local lastTargetPos = Vector3.zero
-    
-    -- Added variables for stuck-detection
-    local lastPos = Vector3.zero
-    local stuckTimer = 0
+    local lastTargetPos = Vector3.zero -- Tracks if the pet actually moved
     
     while task.wait(0.1) do
         if Config.AutoRemoveOtherGardens and (os.clock() - lastGardenClean > 1.5) then
@@ -766,13 +764,14 @@ task.spawn(function()
             local character = LocalPlayer.Character
             local rootPart = character and character:FindFirstChild("HumanoidRootPart")
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            
             local mapFolder = workspace:FindFirstChild("Map")
             local wildFolder = mapFolder and mapFolder:FindFirstChild("WildPetSpawns")
             
             if rootPart and wildFolder and humanoid then
-                -- [PET SCANNING LOGIC REMAINS SAME]
                 local activeTarget = nil
                 local scanAttempts = Config.ServerHopEnabled and 6 or 1
+                
                 for attempt = 1, scanAttempts do
                     for _, petModel in ipairs(wildFolder:GetChildren()) do
                         local attributeName = petModel:GetAttribute("PetName")
@@ -790,57 +789,132 @@ task.spawn(function()
                 
                 if activeTarget then
                     local petRoot = activeTarget.RootPart
+                    local petName = activeTarget:GetAttribute("PetName") or activeTarget.Name
+                    print("[HUNTER]: Safe navigation tracking locked onto " .. tostring(petName))
+                    
+                    local shovel = character:FindFirstChild("Shovel") or LocalPlayer.Backpack:FindFirstChild("Shovel")
+                    if shovel and shovel.Parent == LocalPlayer.Backpack then
+                        humanoid:EquipTool(shovel)
+                        task.wait(0.1) 
+                    end
+                    
+                    local capturedSuccessfully = false
+                    
                     while Config.PetHuntEnabled and activeTarget and activeTarget:IsDescendantOf(wildFolder) and petRoot do
-                        -- ... [THIEF PROTECTION LOGIC REMAINS SAME] ...
-                        
-                        if Config.TeleportMode == "Walk" then
-                            local dist = (rootPart.Position - petRoot.Position).Magnitude
-                            if dist > 6 then
-                                -- Stuck Detection Watchdog
-                                if (rootPart.Position - lastPos).Magnitude < 0.5 then
-                                    stuckTimer = stuckTimer + 0.1
-                                else
-                                    stuckTimer = 0
-                                end
-                                lastPos = rootPart.Position
-
-                                -- If stuck for 2 seconds, clear waypoints and nudge
-                                if stuckTimer > 2 then
-                                    walkWaypoints = {}
-                                    humanoid.Jump = true
-                                    humanoid:Move(Vector3.new(math.random(-2, 2), 0, math.random(-2, 2)))
-                                    stuckTimer = 0
-                                end
-
-                                if #walkWaypoints == 0 or currentWPIndex > #walkWaypoints or (lastTargetPos - petRoot.Position).Magnitude > 8 then
-                                    lastTargetPos = petRoot.Position
-                                    local path = PathfindingService:CreatePath({AgentRadius = 2, AgentHeight = 5, AgentCanJump = true, WaypointSpacing = 4})
-                                    local success = pcall(function() path:ComputeAsync(rootPart.Position, petRoot.Position) end)
-                                    if success and path.Status == Enum.PathStatus.Success then
-                                        walkWaypoints = path:GetWaypoints()
-                                        currentWPIndex = 2 
+                        local closestThief = nil
+                        if Config.ProtectionEnabled then
+                            for _, player in ipairs(Players:GetPlayers()) do
+                                if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                                    local playerRoot = player.Character.HumanoidRootPart
+                                    local distanceToPet = (playerRoot.Position - petRoot.Position).Magnitude
+                                    if distanceToPet <= Config.ProtectionRadius then
+                                        closestThief = playerRoot
+                                        break
                                     end
                                 end
-                                
-                                if #walkWaypoints > 0 and currentWPIndex <= #walkWaypoints then
-                                    local wp = walkWaypoints[currentWPIndex]
-                                    humanoid:MoveTo(wp.Position)
-                                    if (rootPart.Position - wp.Position).Magnitude <= 3.5 then
-                                        currentWPIndex = currentWPIndex + 1
-                                    end
-                                end
-                            else
-                                humanoid:MoveTo(petRoot.Position)
                             end
                         end
-                        -- [REMAINDER OF CAPTURE LOGIC REMAINS SAME]
+                        
+                        if closestThief then
+                            executeInterceptionManeuver(closestThief, petRoot)
+                        else
+                            if Config.TeleportMode == "Teleport" then
+                                rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
+                                
+                            elseif Config.TeleportMode == "Tween" then
+                                local dist = (rootPart.Position - (petRoot.Position + Vector3.new(0, Config.FlyHeight, 0))).Magnitude
+                                if dist > 5 then
+                                    smoothFlyTo(petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0), Config.TweenSpeed)
+                                else
+                                    rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
+                                end
+                                
+                            elseif Config.TeleportMode == "Walk" then
+                                local dist = (rootPart.Position - petRoot.Position).Magnitude
+                                if dist > 6 then
+                                    -- Only recalculate if we have no path, finished it, or the pet moved significantly
+                                    local targetShifted = (lastTargetPos - petRoot.Position).Magnitude > 10
+                                    
+                                    if targetShifted or #walkWaypoints == 0 or currentWPIndex > #walkWaypoints then
+                                        lastTargetPos = petRoot.Position
+                                        local path = PathfindingService:CreatePath({
+                                            AgentRadius = 2,
+                                            AgentHeight = 5,
+                                            AgentCanJump = true,
+                                            WaypointSpacing = 4
+                                        })
+                                        local success = pcall(function()
+                                            path:ComputeAsync(rootPart.Position, petRoot.Position)
+                                        end)
+                                        
+                                        if success and path.Status == Enum.PathStatus.Success then
+                                            walkWaypoints = path:GetWaypoints()
+                                            currentWPIndex = 2 -- Skip WP 1 (player origin) to stop hesitation
+                                        else
+                                            walkWaypoints = {}
+                                        end
+                                    end
+                                    
+                                    if #walkWaypoints > 0 and currentWPIndex <= #walkWaypoints then
+                                        local wp = walkWaypoints[currentWPIndex]
+                                        
+                                        if wp.Action == Enum.PathWaypointAction.Jump then
+                                            humanoid.Jump = true
+                                        end
+                                        
+                                        humanoid:MoveTo(wp.Position)
+                                        
+                                        -- Flat 2D distance calculation to prevent getting stuck orbiting waypoints
+                                        local flatRoot = Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z)
+                                        local flatWP = Vector3.new(wp.Position.X, 0, wp.Position.Z)
+                                        
+                                        if (flatRoot - flatWP).Magnitude <= 4 then
+                                            currentWPIndex = currentWPIndex + 1
+                                        end
+                                    else
+                                        humanoid:MoveTo(petRoot.Position)
+                                    end
+                                else
+                                    humanoid:MoveTo(petRoot.Position)
+                                end
+                            end
+                            
+                            if shovel and shovel.Parent == LocalPlayer.Backpack then
+                                humanoid:EquipTool(shovel)
+                            end
+                        end
+                        
+                        if os.clock() - lastPromptCheck > 0.05 then
+                            lastPromptCheck = os.clock()
+                            deployPurchaseInterception(activeTarget, rootPart)
+                        end
+                        capturedSuccessfully = true
                         task.wait()
+                    end
+                    
+                    deployPurchaseInterception(nil, rootPart)
+                    print("[HUNTER]: Target tracking concluded.")
+                    
+                    if capturedSuccessfully and Config.ServerHopEnabled and Config.PetHuntEnabled then
+                        isProcessingHopLifecycle = true
+                        print("[PET_FINDER]: Target signature captured! Enforcing 40-second static cooldown before initiating room rotation...")
+                        task.wait(40)
+                        if Config.PetHuntEnabled then rotateServerInstance() end
+                        isProcessingHopLifecycle = false
+                    end
+                else
+                    if Config.ServerHopEnabled then
+                        isProcessingHopLifecycle = true
+                        print("[PET_FINDER]: Zero target signatures detected across map boundaries during this session cycle.")
+                        rotateServerInstance()
+                        isProcessingHopLifecycle = false
                     end
                 end
             end
         end
     end
 end)
+
 
 -- ---------------------------------------------------------------------
 -- RAYFIELD UI ENGINE DEPLOYMENT
@@ -1053,7 +1127,7 @@ RayfieldElements["BypassGameplayPaused"] = MiscTab:CreateToggle({
 
 MiscTab:CreateSection("ESP Vectors")
 
-local petOptions = {"None", "Raccoon", "Robin", "Frog", "Bunny", "Deer", "Owl", "Bee", "Unicorn", "GoldenDragonfly", "IceSerpent", "Butterfly", "BaldEagle"}
+local petOptions = {"None", "Raccoon", "Robin", "Frog", "Bunny", "Deer", "Owl", "Bee", "Unicorn", "GoldenDragonfly", "Firefly", "IceSerpent", "Butterfly", "BaldEagle"}
 local rarityOptions = {"None", "Epic", "Legendary", "Mythic", "Super", "Rare", "Uncommon", "Common"}
 local sizeOptions = {"None", "Big", "Huge"}
 
