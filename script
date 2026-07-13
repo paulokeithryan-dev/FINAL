@@ -5,21 +5,24 @@
 
 
 
--- INSTANT LOADING SCREEN BYPASS
+-- BOTTOM-LEFT AUTO-SKIP
 task.spawn(function()
-    local ReplicatedFirst = game:GetService("ReplicatedFirst")
-    local loadingMenu = ReplicatedFirst:FindFirstChild("LoadingScreenMenu")
+    local VirtualInputManager = game:GetService("VirtualInputManager")
     
-    if loadingMenu then
-        -- This disables the UI if it's a ScreenGui or similar
-        if loadingMenu:IsA("GuiObject") or loadingMenu:IsA("ScreenGui") then
-            loadingMenu.Enabled = false
-        end
-        -- Alternatively, if it's a script/folder controlling it, you can destroy it
-        loadingMenu:Destroy()
+    -- Bottom left corner coordinates
+    -- X: 50 pixels from left, Y: Screen Height - 50 pixels
+    local viewport = workspace.CurrentCamera.ViewportSize
+    local x = 50
+    local y = viewport.Y - 50
+    
+    -- Send click events to the bottom left corner
+    for i = 1, 5 do
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+        task.wait(0.2)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+        task.wait(0.5)
     end
 end)
-
 
 
 
