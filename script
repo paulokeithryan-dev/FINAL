@@ -840,11 +840,10 @@ task.spawn(function()
                                     
                                     -- Movement Watchdog
                                     local lastPos = rootPart.Position
-                                    task.wait(1.5)
+                                    task.wait(0.5)
                                     if (rootPart.Position - lastPos).Magnitude < 1 then
                                         humanoid.Jump = true
                                         humanoid:Move(Vector3.new(math.random(-1, 1), 0, math.random(-1, 1)))
-                                        task.wait(0.5)
                                     end
                                     
                                     if #walkWaypoints > 0 and currentWPIndex <= #walkWaypoints then
