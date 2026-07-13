@@ -54,7 +54,7 @@ local Config = {
     ESPSelectedSizes = "None",
     
     -- SETTINGS CONTROL MATRIX
-    TeleportMode = "Tween",
+    TeleportMode = "Walk",
     SkipLoadingScreen = false
 }
 
@@ -157,15 +157,16 @@ local function smoothFlyTo(targetCFrame, speedOverride)
 end
 
 local function executeDualActionStrike(shovel)
-    -- Global screen center coordinate simulation
     local camera = workspace.CurrentCamera
     if camera then
-        local screenCenter = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+        -- Shifted from viewport center to the absolute top-center edge (dead zone)
+        local safeEdgeX = camera.ViewportSize.X / 2
+        local safeEdgeY = 1 
         
-        -- Simulate genuine MouseButton1 click at center screen
-        VirtualInputManager:SendMouseButtonEvent(screenCenter.X, screenCenter.Y, 0, true, game, 0)
+        -- Simulate genuine MouseButton1 click at the safe edge
+        VirtualInputManager:SendMouseButtonEvent(safeEdgeX, safeEdgeY, 0, true, game, 0)
         task.wait(0.05)
-        VirtualInputManager:SendMouseButtonEvent(screenCenter.X, screenCenter.Y, 0, false, game, 0)
+        VirtualInputManager:SendMouseButtonEvent(safeEdgeX, safeEdgeY, 0, false, game, 0)
     end
     
     -- Fallback: If held tool is valid, trigger its internal event once as a secondary layer
@@ -893,9 +894,9 @@ end)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "Premium UI Engine - VERSION 6.2 (RECON)",
+    Name = "PET HUB",
     LoadingTitle = "Pet Hunter Engine",
-    LoadingSubtitle = "by Recon",
+    LoadingSubtitle = "by Kisso",
     ConfigurationSaving = {
         Enabled = false, 
     },
