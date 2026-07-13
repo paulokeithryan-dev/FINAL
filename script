@@ -4,7 +4,7 @@
 -- =====================================================================
 
 
--- MOBILE AUTO-SKIP: CLEAN EXIT VERSION
+-- MOBILE AUTO-SKIP: CLEAN VERSION
 task.spawn(function()
     local Players = game:GetService("Players")
     local UserInputService = game:GetService("UserInputService")
@@ -12,28 +12,26 @@ task.spawn(function()
     
     local x = 50
     local y = workspace.CurrentCamera.ViewportSize.Y - 50
+    
+    -- Variable to hold the connection
+    local touchConnection
 
     local function killScript()
-        print("Interrupt detected! Stopping auto-clicker...")
-        -- Try to force the executor to release input lock
-        if RunService then RunService:SetRobloxGuiFocused(false) end
-        return true -- Signals the loop to die
+        print("Interrupt detected! Stopping Auto-clicker...")
+        -- Disconnect the listener so it stops logging
+        if touchConnection then touchConnection:Disconnect() end
+        return true 
     end
 
-    -- Kills the script the moment you touch anywhere on the screen
-    UserInputService.InputBegan:Connect(function()
+    -- Assign the connection to the variable
+    touchConnection = UserInputService.InputBegan:Connect(function()
         killScript()
     end)
 
     while true do
-        -- If user touched screen, stop loop immediately
-        if UserInputService:GetMouseDelta().Magnitude > 0 or false then -- Simplified check
-             break
-        end
-        
-        -- Logic: Scan for the loading screen
         local found = false
         local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+        
         for _, obj in pairs(PlayerGui:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(obj.Text, "Click to skip!") then
                 if obj.Visible and obj.Parent and obj.Parent.Visible then
@@ -51,11 +49,11 @@ task.spawn(function()
         end
     end
     
-    -- Tell the game to go back to normal
+    -- Cleanup: Disconnect if the loop ends naturally (screen gone)
+    if touchConnection then touchConnection:Disconnect() end
     if RunService then RunService:SetRobloxGuiFocused(false) end
-    print("Script finished. Toggle 'Mouse Mode' OFF in your executor to walk!")
+    print("Script finished and cleaned up.")
 end)
-
 
 
 -- Global Configuration Matrix
