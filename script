@@ -159,9 +159,9 @@ end
 local function executeDualActionStrike(shovel)
     local camera = workspace.CurrentCamera
     if camera then
-        -- Shifted from viewport center to the absolute top-center edge (dead zone)
-        local safeEdgeX = camera.ViewportSize.X / 2
-        local safeEdgeY = 1 
+        -- Shifted to the absolute bottom-left edge
+        local safeEdgeX = 1 
+        local safeEdgeY = camera.ViewportSize.Y - 1 
         
         -- Simulate genuine MouseButton1 click at the safe edge
         VirtualInputManager:SendMouseButtonEvent(safeEdgeX, safeEdgeY, 0, true, game, 0)
