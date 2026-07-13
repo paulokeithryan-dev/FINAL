@@ -5,31 +5,28 @@
 
 
 
--- AUTO-SKIP CLICKER: BOTTOM-LEFT TARGETING
+-- RELIABLE AUTO-SKIP (STOPS WHEN UI IS GONE)
 task.spawn(function()
     local VirtualInputManager = game:GetService("VirtualInputManager")
     local Players = game:GetService("Players")
-    local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+    local LocalPlayer = Players.LocalPlayer
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-    local function isSkipVisible()
-        for _, obj in pairs(PlayerGui:GetDescendants()) do
-            if obj:IsA("TextLabel") and string.find(obj.Text, "Click to skip!") then
-                return obj.Visible
-            end
+    -- Define the UI element that needs to disappear
+    -- Update "LoadingScreen" to the exact name in your Explorer
+    local targetUI = PlayerGui:WaitForChild("LoadingScreen", 5) 
+
+    if targetUI then
+        while targetUI and targetUI.Parent == PlayerGui do
+            local viewport = workspace.CurrentCamera.ViewportSize
+            local x = 50
+            local y = viewport.Y - 50
+            
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+            
+            task.wait(0.5)
         end
-        return false
-    end
-
-    while isSkipVisible() do
-        local viewport = workspace.CurrentCamera.ViewportSize
-        -- Bottom-Left positioning
-        local x = 50
-        local y = viewport.Y - 50
-        
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-        
-        task.wait(0.5)
     end
 end)
 
