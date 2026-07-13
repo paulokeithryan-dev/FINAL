@@ -5,28 +5,29 @@
 
 
 
--- RELIABLE AUTO-SKIP (STOPS WHEN UI IS GONE)
+-- RELIABLE AUTO-SKIP (TARGETING LOADING UI)
 task.spawn(function()
     local VirtualInputManager = game:GetService("VirtualInputManager")
     local Players = game:GetService("Players")
-    local LocalPlayer = Players.LocalPlayer
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+    local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-    -- Define the UI element that needs to disappear
-    -- Update "LoadingScreen" to the exact name in your Explorer
-    local targetUI = PlayerGui:WaitForChild("LoadingScreen", 5) 
+    -- This checks for the specific loading UI container
+    -- Based on your explorer, it's likely named 'LoadingScreen' or similar
+    local function getLoadingGui()
+        return PlayerGui:FindFirstChild("LoadingScreen") or PlayerGui:FindFirstChild("LoadingScreenMenu")
+    end
 
-    if targetUI then
-        while targetUI and targetUI.Parent == PlayerGui do
-            local viewport = workspace.CurrentCamera.ViewportSize
-            local x = 50
-            local y = viewport.Y - 50
-            
-            VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-            
-            task.wait(0.5)
-        end
+    -- Keep clicking until the loading UI is removed by the game
+    while getLoadingGui() do
+        local viewport = workspace.CurrentCamera.ViewportSize
+        -- Using bottom-left as requested
+        local x = 50
+        local y = viewport.Y - 50
+        
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+        
+        task.wait(1) -- Click once per second until it disappears
     end
 end)
 
