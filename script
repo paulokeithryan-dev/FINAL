@@ -4,55 +4,54 @@
 -- =====================================================================
 
 
--- MOBILE AUTO-SKIP: CLEAN VERSION
+-- UNIVERSAL AUTO-SKIP: PC & MOBILE STABLE
 task.spawn(function()
     local Players = game:GetService("Players")
     local UserInputService = game:GetService("UserInputService")
-    local RunService = game:GetService("RunService")
+    local VirtualInputManager = game:GetService("VirtualInputManager")
+    local LocalPlayer = Players.LocalPlayer
     
-    local x = 50
-    local y = workspace.CurrentCamera.ViewportSize.Y - 50
-    
-    -- Variable to hold the connection
-    local touchConnection
+    local shouldStop = false
 
-    local function killScript()
-        print("Interrupt detected! Stopping Auto-clicker...")
-        -- Disconnect the listener so it stops logging
-        if touchConnection then touchConnection:Disconnect() end
-        return true 
-    end
-
-    -- Assign the connection to the variable
-    touchConnection = UserInputService.InputBegan:Connect(function()
-        killScript()
+    -- UNIVERSAL KILL SWITCH: Triggers on Keyboard (PC) or Touch (Mobile)
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        -- Pressing 'X' (PC) or touching screen (Mobile) stops the script
+        if input.KeyCode == Enum.KeyCode.X or input.UserInputType == Enum.UserInputType.Touch then
+            shouldStop = true
+            print("Interrupt detected! Stopping auto-clicker...")
+        end
     end)
 
-    while true do
+    -- Define the Click Position (Bottom-Left)
+    local x = 50
+    local y = workspace.CurrentCamera.ViewportSize.Y - 50
+
+    while not shouldStop do
         local found = false
-        local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+        local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
         
+        -- Scan for the button
         for _, obj in pairs(PlayerGui:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(obj.Text, "Click to skip!") then
+                -- Check if it is truly visible and inside a ScreenGui
                 if obj.Visible and obj.Parent and obj.Parent.Visible then
                     found = true
+                    -- Stable Click Method: VirtualInputManager
+                    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+                    task.wait(0.05)
+                    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
                 end
             end
         end
 
-        if found then
-            if mousemoveabs then mousemoveabs(x, y) end
-            if mouse1click then mouse1click() end
-            task.wait(0.5)
-        else
-            break -- Screen is gone
+        if not found then
+            -- If we didn't find the text, maybe it's gone. Check for 2 seconds before breaking.
+            task.wait(2) 
+            break
         end
+
+        task.wait(0.5)
     end
-    
-    -- Cleanup: Disconnect if the loop ends naturally (screen gone)
-    if touchConnection then touchConnection:Disconnect() end
-    if RunService then RunService:SetRobloxGuiFocused(false) end
-    print("Script finished and cleaned up.")
 end)
 
 
