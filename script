@@ -4,47 +4,52 @@
 -- =====================================================================
 
 
--- AUTO-SKIP CLICKER: ROBUST STOP-LOGIC
+-- AUTO-SKIP CLICKER: VISIBLE CURSOR & STRICT UI CHECK
 task.spawn(function()
-    local VirtualInputManager = game:GetService("VirtualInputManager")
     local Players = game:GetService("Players")
     local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+    local RunService = game:GetService("RunService")
 
-    -- Define the container you found in your explorer
-    -- Replace "LoadingScreen" with the EXACT name of the folder that holds the UI
-    local loadingFolder = PlayerGui:FindFirstChild("LoadingScreen") 
+    -- Define the click target (Bottom-Left)
+    local viewport = workspace.CurrentCamera.ViewportSize
+    local x, y = 50, viewport.Y - 50
 
     local function shouldClick()
-        if not loadingFolder then return false end
-        
-        -- Check if the folder is still enabled and its main GUI is visible
-        if loadingFolder.Enabled == false then return false end
-        
-        -- Double check the specific label you were looking for
-        for _, obj in pairs(loadingFolder:GetDescendants()) do
+        -- 1. Scan for the specific label
+        for _, obj in pairs(PlayerGui:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(obj.Text, "Click to skip!") then
-                return obj.Visible
+                -- 2. CRITICAL: Check if it's actually visible AND its parent is active
+                -- If the parent is hidden, the label is effectively gone
+                if obj.Visible and obj.Parent and obj.Parent.Visible then
+                    return true
+                end
             end
         end
         return false
     end
 
-    while shouldClick() do
-        local viewport = workspace.CurrentCamera.ViewportSize
-        local x = 50
-        local y = viewport.Y - 50
-        
-        -- Move visual cursor if executor allows
-        if mousemoveabs then mousemoveabs(x, y) end
-        
-        -- Send click
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-        
-        task.wait(0.5)
-    end
-end)
+    while true do
+        -- Check if we should still be clicking
+        if not shouldClick() then
+            break -- Exit the loop immediately when text is gone
+        end
 
+        -- Move the visual cursor
+        if mousemoveabs then
+            mousemoveabs(x, y)
+        end
+        
+        -- Perform click
+        if mouse1click then
+            mouse1click()
+        end
+
+        -- Wait 1 second to give your joystick priority
+        task.wait(1) 
+    end
+    
+    print("Loading screen skipped. Auto-clicker disabled.")
+end)
 
 
 -- Global Configuration Matrix
