@@ -4,39 +4,41 @@
 -- =====================================================================
 
 
--- RAW CURSOR AUTO-SKIP: BOTTOM-LEFT TARGETING
+-- RAW CURSOR AUTO-CLICKER: MOBILE EMULATION VERSION
 task.spawn(function()
     local Players = game:GetService("Players")
     local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+    
+    -- Target coordinates (Change these if the skip button is somewhere else)
+    local x = 500
+    local y = 500
 
-    -- Define target
-    local viewport = workspace.CurrentCamera.ViewportSize
-    local x = 50
-    local y = viewport.Y - 50
-
-    local function isSkipVisible()
-        -- Scan all GUI elements for the specific label
+    while true do
+        local found = false
+        
+        -- Scan for the label
         for _, obj in pairs(PlayerGui:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(obj.Text, "Click to skip!") then
-                -- Only return true if the label is ACTUALLY visible
-                return obj.Visible
+                -- Check if it is visible
+                if obj.Visible and obj.Parent and obj.Parent.Visible then
+                    found = true
+                end
             end
         end
-        return false
-    end
 
-    while isSkipVisible() do
-        -- 1. Physically move the raw cursor to the target
-        if mousemoveabs then
-            mousemoveabs(x, y)
+        if found then
+            -- Move cursor and click
+            if mousemoveabs then
+                mousemoveabs(x, y)
+            end
+            if mouse1click then
+                mouse1click()
+            end
+            task.wait(0.5)
+        else
+            -- Break the loop immediately when text is gone
+            break 
         end
-        
-        -- 2. Physically trigger the hardware click
-        if mouse1click then
-            mouse1click()
-        end
-        
-        task.wait(0.5) -- Adjust this delay to let your joystick have space
     end
 end)
 
