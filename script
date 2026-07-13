@@ -913,6 +913,34 @@ local ConfigTab = Window:CreateTab("Configs", nil)
 -- ==========================================
 -- TAB 1: PET HUNTER ENGINE CONFIGURATION
 -- ==========================================
+HuntTab:CreateSection("Pet Finder")
+
+RayfieldElements["ServerHopEnabled"] = HuntTab:CreateToggle({
+    Name = "Enable Automated Server Hopping",
+    CurrentValue = Config.ServerHopEnabled,
+    Flag = "ServerHopEnabled",
+    Callback = function(Value)
+        Config.ServerHopEnabled = Value
+    end,
+})
+
+RayfieldElements["MaxServerPlayers"] = HuntTab:CreateInput({
+    Name = "Max Server Players Limit",
+    CurrentValue = tostring(Config.MaxServerPlayers),
+    PlaceholderText = "2",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        Config.MaxServerPlayers = tonumber(Text) or 2
+    end,
+})
+
+HuntTab:CreateButton({
+    Name = "Manual Trigger Room Rotation",
+    Callback = function()
+        rotateServerInstance()
+    end,
+})
+
 HuntTab:CreateSection("Wild Pet")
 
 RayfieldElements["PetHuntEnabled"] = HuntTab:CreateToggle({
@@ -963,33 +991,6 @@ for _, petData in ipairs(Database) do
         end,
     })
 end
-
-HuntTab:CreateSection("Pet Finder")
-RayfieldElements["ServerHopEnabled"] = HuntTab:CreateToggle({
-    Name = "Enable Automated Server Hopping",
-    CurrentValue = Config.ServerHopEnabled,
-    Flag = "ServerHopEnabled",
-    Callback = function(Value)
-        Config.ServerHopEnabled = Value
-    end,
-})
-
-RayfieldElements["MaxServerPlayers"] = HuntTab:CreateInput({
-    Name = "Max Server Players Limit",
-    CurrentValue = tostring(Config.MaxServerPlayers),
-    PlaceholderText = "2",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(Text)
-        Config.MaxServerPlayers = tonumber(Text) or 2
-    end,
-})
-
-HuntTab:CreateButton({
-    Name = "Manual Trigger Room Rotation",
-    Callback = function()
-        rotateServerInstance()
-    end,
-})
 
 -- ==========================================
 -- TAB 2: MISCELLANEOUS & OPTIMIZATION
