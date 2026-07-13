@@ -5,37 +5,44 @@
 
 
 
--- AUTO-SKIP USING PHYSICAL CURSOR
+-- PHYSICAL MOUSE CURSOR AUTO-SKIP
 task.spawn(function()
     local Players = game:GetService("Players")
     local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
     
-    -- The UI object we are monitoring to know when to stop
-    -- Make sure this name matches your Explorer (e.g., 'LoadingScreen')
-    local loadingGui = PlayerGui:WaitForChild("LoadingScreen", 10)
+    -- Target: Bottom-Left (50, Height - 50)
+    local viewport = workspace.CurrentCamera.ViewportSize
+    local targetX = 50
+    local targetY = viewport.Y - 50
+    
+    -- Function to detect if the loading screen still exists
+    local function isLoaded()
+        -- Update "LoadingScreen" to the exact name in your Explorer
+        return PlayerGui:FindFirstChild("LoadingScreen") ~= nil
+    end
 
-    while loadingGui and loadingGui.Parent == PlayerGui do
-        -- 1. Define Bottom-Left coordinates
-        local viewport = workspace.CurrentCamera.ViewportSize
-        local targetX = 50
-        local targetY = viewport.Y - 50
-        
-        -- 2. Move physical cursor and click
+    -- Run loop as long as the loading screen is present
+    while isLoaded() do
+        -- Use the executor's mouse movement function
+        -- Some executors use 'mousemoveabs' or 'setmousepos'
         if mousemoveabs then
             mousemoveabs(targetX, targetY)
-            task.wait(0.1)
-            mouse1click()
-        else
-            -- Fallback if your executor doesn't support mousemoveabs
-            -- It will at least try to click the location
+        elseif setmousepos then
+            setmousepos(targetX, targetY)
+        end
+        
+        -- Perform the click
+        if mouse1click then
             mouse1click()
         end
         
-        task.wait(1) -- Click interval
+        task.wait(1) -- Wait 1 second between clicks to avoid lag
     end
     
-    print("Loading screen gone, auto-cursor stopped.")
+    print("Loading screen gone, auto-clicker disabled.")
 end)
+
+
 
 -- Global Configuration Matrix
 local Config = {
