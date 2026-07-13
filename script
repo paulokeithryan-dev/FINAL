@@ -5,45 +5,48 @@
 
 
 
--- LOCK CURSOR TO BOTTOM-LEFT AND CLICK
+-- AUTO-SKIP: OPTIMIZED FOR JOYSTICK COMPATIBILITY
 task.spawn(function()
+    local VirtualInputManager = game:GetService("VirtualInputManager")
     local Players = game:GetService("Players")
-    local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-    
-    -- Bottom-left coordinates
-    local viewport = workspace.CurrentCamera.ViewportSize
-    local targetX = 50
-    local targetY = viewport.Y - 50
-    
-    -- Function to detect the Loading screen
-    local function isLoaded()
-        -- Ensure this name matches your Explorer exactly
-        return PlayerGui:FindFirstChild("LoadingScreen") ~= nil
+    local LocalPlayer = Players.LocalPlayer
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+    -- Define the specific UI object path if possible (much faster than searching all descendants)
+    -- If your UI is named "LoadingScreen", this is more efficient:
+    local loadingScreen = PlayerGui:WaitForChild("LoadingScreen", 5)
+
+    -- Function to check if the specific "Click to skip!" label is visible
+    local function isSkipVisible()
+        if not loadingScreen or not loadingScreen.Enabled then return false end
+        
+        -- Use a targeted search within the loading screen only
+        local skipLabel = loadingScreen:FindFirstChild("ClickToSkipLabel", true) -- Change to exact name
+        if skipLabel and skipLabel:IsA("TextLabel") then
+            return skipLabel.Visible
+        end
+        return false
     end
 
-    -- 1. Move cursor to position immediately
-    if mousemoveabs then
-        mousemoveabs(targetX, targetY)
-    end
+    -- Loop runs ONLY while the screen is detected
+    while true do
+        -- Check if the screen is still there; if not, break the loop immediately
+        if not PlayerGui:FindFirstChild("LoadingScreen") then
+            break 
+        end
 
-    -- 2. Click loop
-    while isLoaded() do
-        -- Keep the cursor locked to that spot
-        if mousemoveabs then
-            mousemoveabs(targetX, targetY)
-        end
+        local viewport = workspace.CurrentCamera.ViewportSize
+        local x = 50
+        local y = viewport.Y - 50
         
-        -- Perform the click
-        if mouse1click then
-            mouse1click()
-        end
+        -- Send the click
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
         
-        task.wait(0.5)
+        -- Increase wait time slightly to give your joystick input priority
+        task.wait(1.0) 
     end
-    
-    print("Loading screen removed. Auto-clicker stopped.")
 end)
-
 
 
 -- Global Configuration Matrix
