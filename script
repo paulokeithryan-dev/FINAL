@@ -746,7 +746,7 @@ task.spawn(function()
     
     local walkWaypoints = {}
     local currentWPIndex = 1
-    local lastTargetPos = Vector3.zero -- Tracks if the pet actually moved
+    local lastTargetPos = Vector3.zero
     
     while task.wait(0.1) do
         if Config.AutoRemoveOtherGardens and (os.clock() - lastGardenClean > 1.5) then
@@ -787,9 +787,6 @@ task.spawn(function()
                 
                 if activeTarget then
                     local petRoot = activeTarget.RootPart
-                    local petName = activeTarget:GetAttribute("PetName") or activeTarget.Name
-                    print("[HUNTER]: Safe navigation tracking locked onto " .. tostring(petName))
-                    
                     local shovel = character:FindFirstChild("Shovel") or LocalPlayer.Backpack:FindFirstChild("Shovel")
                     if shovel and shovel.Parent == LocalPlayer.Backpack then
                         humanoid:EquipTool(shovel)
@@ -804,8 +801,7 @@ task.spawn(function()
                             for _, player in ipairs(Players:GetPlayers()) do
                                 if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                                     local playerRoot = player.Character.HumanoidRootPart
-                                    local distanceToPet = (playerRoot.Position - petRoot.Position).Magnitude
-                                    if distanceToPet <= Config.ProtectionRadius then
+                                    if (playerRoot.Position - petRoot.Position).Magnitude <= Config.ProtectionRadius then
                                         closestThief = playerRoot
                                         break
                                     end
@@ -818,7 +814,6 @@ task.spawn(function()
                         else
                             if Config.TeleportMode == "Teleport" then
                                 rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
-                                
                             elseif Config.TeleportMode == "Tween" then
                                 local dist = (rootPart.Position - (petRoot.Position + Vector3.new(0, Config.FlyHeight, 0))).Magnitude
                                 if dist > 5 then
@@ -826,47 +821,37 @@ task.spawn(function()
                                 else
                                     rootPart.CFrame = petRoot.CFrame * CFrame.new(0, Config.FlyHeight, 0)
                                 end
-                                
                             elseif Config.TeleportMode == "Walk" then
                                 local dist = (rootPart.Position - petRoot.Position).Magnitude
                                 if dist > 6 then
-                                    -- Only recalculate if we have no path, finished it, or the pet moved significantly
                                     local targetShifted = (lastTargetPos - petRoot.Position).Magnitude > 10
                                     
                                     if targetShifted or #walkWaypoints == 0 or currentWPIndex > #walkWaypoints then
                                         lastTargetPos = petRoot.Position
-                                        local path = PathfindingService:CreatePath({
-                                            AgentRadius = 2,
-                                            AgentHeight = 5,
-                                            AgentCanJump = true,
-                                            WaypointSpacing = 4
-                                        })
-                                        local success = pcall(function()
-                                            path:ComputeAsync(rootPart.Position, petRoot.Position)
-                                        end)
-                                        
+                                        local path = PathfindingService:CreatePath({AgentRadius = 2, AgentHeight = 5, AgentCanJump = true, WaypointSpacing = 4})
+                                        local success = pcall(function() path:ComputeAsync(rootPart.Position, petRoot.Position) end)
                                         if success and path.Status == Enum.PathStatus.Success then
                                             walkWaypoints = path:GetWaypoints()
-                                            currentWPIndex = 2 -- Skip WP 1 (player origin) to stop hesitation
+                                            currentWPIndex = 2 
                                         else
                                             walkWaypoints = {}
                                         end
                                     end
                                     
+                                    -- Movement Watchdog
+                                    local lastPos = rootPart.Position
+                                    task.wait(1.5)
+                                    if (rootPart.Position - lastPos).Magnitude < 1 then
+                                        humanoid.Jump = true
+                                        humanoid:Move(Vector3.new(math.random(-1, 1), 0, math.random(-1, 1)))
+                                        task.wait(0.5)
+                                    end
+                                    
                                     if #walkWaypoints > 0 and currentWPIndex <= #walkWaypoints then
                                         local wp = walkWaypoints[currentWPIndex]
-                                        
-                                        if wp.Action == Enum.PathWaypointAction.Jump then
-                                            humanoid.Jump = true
-                                        end
-                                        
+                                        if wp.Action == Enum.PathWaypointAction.Jump then humanoid.Jump = true end
                                         humanoid:MoveTo(wp.Position)
-                                        
-                                        -- Flat 2D distance calculation to prevent getting stuck orbiting waypoints
-                                        local flatRoot = Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z)
-                                        local flatWP = Vector3.new(wp.Position.X, 0, wp.Position.Z)
-                                        
-                                        if (flatRoot - flatWP).Magnitude <= 4 then
+                                        if (Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z) - Vector3.new(wp.Position.X, 0, wp.Position.Z)).Magnitude <= 4 then
                                             currentWPIndex = currentWPIndex + 1
                                         end
                                     else
@@ -891,22 +876,16 @@ task.spawn(function()
                     end
                     
                     deployPurchaseInterception(nil, rootPart)
-                    print("[HUNTER]: Target tracking concluded.")
-                    
                     if capturedSuccessfully and Config.ServerHopEnabled and Config.PetHuntEnabled then
                         isProcessingHopLifecycle = true
-                        print("[PET_FINDER]: Target signature captured! Enforcing 40-second static cooldown before initiating room rotation...")
                         task.wait(40)
                         if Config.PetHuntEnabled then rotateServerInstance() end
                         isProcessingHopLifecycle = false
                     end
-                else
-                    if Config.ServerHopEnabled then
-                        isProcessingHopLifecycle = true
-                        print("[PET_FINDER]: Zero target signatures detected across map boundaries during this session cycle.")
-                        rotateServerInstance()
-                        isProcessingHopLifecycle = false
-                    end
+                elseif Config.ServerHopEnabled then
+                    isProcessingHopLifecycle = true
+                    rotateServerInstance()
+                    isProcessingHopLifecycle = false
                 end
             end
         end
