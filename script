@@ -728,9 +728,9 @@ task.spawn(function()
     local lastGardenClean = 0
     local isProcessingHopLifecycle = false
     
-    local lastPathCompute = 0
     local walkWaypoints = {}
     local currentWPIndex = 1
+    local lastTargetPos = Vector3.zero -- Tracks if the pet actually moved
     
     while task.wait(0.1) do
         if Config.AutoRemoveOtherGardens and (os.clock() - lastGardenClean > 1.5) then
@@ -814,8 +814,11 @@ task.spawn(function()
                             elseif Config.TeleportMode == "Walk" then
                                 local dist = (rootPart.Position - petRoot.Position).Magnitude
                                 if dist > 6 then
-                                    if os.clock() - lastPathCompute > 1.2 or #walkWaypoints == 0 or currentWPIndex > #walkWaypoints then
-                                        lastPathCompute = os.clock()
+                                    -- Only recalculate if we have no path, finished it, or the pet moved significantly
+                                    local targetShifted = (lastTargetPos - petRoot.Position).Magnitude > 10
+                                    
+                                    if targetShifted or #walkWaypoints == 0 or currentWPIndex > #walkWaypoints then
+                                        lastTargetPos = petRoot.Position
                                         local path = PathfindingService:CreatePath({
                                             AgentRadius = 2,
                                             AgentHeight = 5,
@@ -828,7 +831,7 @@ task.spawn(function()
                                         
                                         if success and path.Status == Enum.PathStatus.Success then
                                             walkWaypoints = path:GetWaypoints()
-                                            currentWPIndex = 1
+                                            currentWPIndex = 2 -- Skip WP 1 (player origin) to stop hesitation
                                         else
                                             walkWaypoints = {}
                                         end
@@ -836,11 +839,18 @@ task.spawn(function()
                                     
                                     if #walkWaypoints > 0 and currentWPIndex <= #walkWaypoints then
                                         local wp = walkWaypoints[currentWPIndex]
+                                        
                                         if wp.Action == Enum.PathWaypointAction.Jump then
                                             humanoid.Jump = true
                                         end
+                                        
                                         humanoid:MoveTo(wp.Position)
-                                        if (rootPart.Position - wp.Position).Magnitude <= 4 then
+                                        
+                                        -- Flat 2D distance calculation to prevent getting stuck orbiting waypoints
+                                        local flatRoot = Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z)
+                                        local flatWP = Vector3.new(wp.Position.X, 0, wp.Position.Z)
+                                        
+                                        if (flatRoot - flatWP).Magnitude <= 4 then
                                             currentWPIndex = currentWPIndex + 1
                                         end
                                     else
