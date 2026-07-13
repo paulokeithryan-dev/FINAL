@@ -5,32 +5,32 @@
 
 
 
--- RELIABLE AUTO-SKIP (TARGETING LOADING UI)
+-- RELIABLE AUTO-SKIP (STOPS WHEN UI IS GONE)
 task.spawn(function()
     local VirtualInputManager = game:GetService("VirtualInputManager")
     local Players = game:GetService("Players")
     local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-    -- This checks for the specific loading UI container
-    -- Based on your explorer, it's likely named 'LoadingScreen' or similar
-    local function getLoadingGui()
-        return PlayerGui:FindFirstChild("LoadingScreen") or PlayerGui:FindFirstChild("LoadingScreenMenu")
-    end
+    -- 1. WAIT for the loading screen to appear
+    -- Change "LoadingScreen" to the exact name seen in your Explorer
+    local loadingGui = PlayerGui:WaitForChild("LoadingScreen", 10) 
 
-    -- Keep clicking until the loading UI is removed by the game
-    while getLoadingGui() do
-        local viewport = workspace.CurrentCamera.ViewportSize
-        -- Using bottom-left as requested
-        local x = 50
-        local y = viewport.Y - 50
+    if loadingGui then
+        -- 2. CLICK LOOP: Only runs while the UI is still in the PlayerGui
+        while loadingGui and loadingGui.Parent == PlayerGui do
+            local viewport = workspace.CurrentCamera.ViewportSize
+            local x = 50
+            local y = viewport.Y - 50
+            
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+            
+            task.wait(0.5) -- Adjust this delay if it's clicking too fast
+        end
         
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-        
-        task.wait(1) -- Click once per second until it disappears
+        print("Loading screen removed. Auto-clicker stopped.")
     end
 end)
-
 
 -- Global Configuration Matrix
 local Config = {
