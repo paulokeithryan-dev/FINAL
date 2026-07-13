@@ -824,37 +824,22 @@ task.spawn(function()
                             elseif Config.TeleportMode == "Walk" then
                                 local dist = (rootPart.Position - petRoot.Position).Magnitude
                                 if dist > 6 then
-                                    local targetShifted = (lastTargetPos - petRoot.Position).Magnitude > 10
-                                    
-                                    if targetShifted or #walkWaypoints == 0 or currentWPIndex > #walkWaypoints then
+                                    if #walkWaypoints == 0 or currentWPIndex > #walkWaypoints or (lastTargetPos - petRoot.Position).Magnitude > 8 then
                                         lastTargetPos = petRoot.Position
                                         local path = PathfindingService:CreatePath({AgentRadius = 2, AgentHeight = 5, AgentCanJump = true, WaypointSpacing = 4})
                                         local success = pcall(function() path:ComputeAsync(rootPart.Position, petRoot.Position) end)
                                         if success and path.Status == Enum.PathStatus.Success then
                                             walkWaypoints = path:GetWaypoints()
                                             currentWPIndex = 2 
-                                        else
-                                            walkWaypoints = {}
                                         end
-                                    end
-                                    
-                                    -- Movement Watchdog
-                                    local lastPos = rootPart.Position
-                                    task.wait(0.5)
-                                    if (rootPart.Position - lastPos).Magnitude < 1 then
-                                        humanoid.Jump = true
-                                        humanoid:Move(Vector3.new(math.random(-1, 1), 0, math.random(-1, 1)))
                                     end
                                     
                                     if #walkWaypoints > 0 and currentWPIndex <= #walkWaypoints then
                                         local wp = walkWaypoints[currentWPIndex]
-                                        if wp.Action == Enum.PathWaypointAction.Jump then humanoid.Jump = true end
                                         humanoid:MoveTo(wp.Position)
-                                        if (Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z) - Vector3.new(wp.Position.X, 0, wp.Position.Z)).Magnitude <= 4 then
+                                        if (rootPart.Position - wp.Position).Magnitude <= 3.5 then
                                             currentWPIndex = currentWPIndex + 1
                                         end
-                                    else
-                                        humanoid:MoveTo(petRoot.Position)
                                     end
                                 else
                                     humanoid:MoveTo(petRoot.Position)
