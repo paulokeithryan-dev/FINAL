@@ -5,30 +5,32 @@
 
 
 
--- PHYSICAL MOUSE CURSOR AUTO-SKIP
+-- LOCK CURSOR TO BOTTOM-LEFT AND CLICK
 task.spawn(function()
     local Players = game:GetService("Players")
     local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
     
-    -- Target: Bottom-Left (50, Height - 50)
+    -- Bottom-left coordinates
     local viewport = workspace.CurrentCamera.ViewportSize
     local targetX = 50
     local targetY = viewport.Y - 50
     
-    -- Function to detect if the loading screen still exists
+    -- Function to detect the Loading screen
     local function isLoaded()
-        -- Update "LoadingScreen" to the exact name in your Explorer
+        -- Ensure this name matches your Explorer exactly
         return PlayerGui:FindFirstChild("LoadingScreen") ~= nil
     end
 
-    -- Run loop as long as the loading screen is present
+    -- 1. Move cursor to position immediately
+    if mousemoveabs then
+        mousemoveabs(targetX, targetY)
+    end
+
+    -- 2. Click loop
     while isLoaded() do
-        -- Use the executor's mouse movement function
-        -- Some executors use 'mousemoveabs' or 'setmousepos'
+        -- Keep the cursor locked to that spot
         if mousemoveabs then
             mousemoveabs(targetX, targetY)
-        elseif setmousepos then
-            setmousepos(targetX, targetY)
         end
         
         -- Perform the click
@@ -36,10 +38,10 @@ task.spawn(function()
             mouse1click()
         end
         
-        task.wait(1) -- Wait 1 second between clicks to avoid lag
+        task.wait(0.5)
     end
     
-    print("Loading screen gone, auto-clicker disabled.")
+    print("Loading screen removed. Auto-clicker stopped.")
 end)
 
 
