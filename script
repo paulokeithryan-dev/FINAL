@@ -830,7 +830,6 @@ task.spawn(function()
                             elseif Config.TeleportMode == "Walk" then
                                 local dist = (rootPart.Position - petRoot.Position).Magnitude
                                 if dist > 6 then
-                                    -- Only recalculate if we have no path, finished it, or the pet moved significantly
                                     local targetShifted = (lastTargetPos - petRoot.Position).Magnitude > 10
                                     
                                     if targetShifted or #walkWaypoints == 0 or currentWPIndex > #walkWaypoints then
@@ -847,21 +846,39 @@ task.spawn(function()
                                         
                                         if success and path.Status == Enum.PathStatus.Success then
                                             walkWaypoints = path:GetWaypoints()
-                                            currentWPIndex = 2 -- Skip WP 1 (player origin) to stop hesitation
+                                            currentWPIndex = 2 
                                         else
                                             walkWaypoints = {}
                                         end
                                     end
                                     
+                                    -- MOVEMENT WATCHDOG: Detect if stuck
+                                    local lastPos = rootPart.Position
+                                    task.wait(1.5) -- Small window to see if we moved
+                                    if (rootPart.Position - lastPos).Magnitude < 1 then
+                                        print("[HUNTER]: Path obstructed. Initiating recovery jump/nudge...")
+                                        humanoid.Jump = true
+                                        humanoid:Move(Vector3.new(math.random(-1, 1), 0, math.random(-1, 1))) -- Random nudge
+                                        task.wait(0.5)
+                                    end
+                                    
                                     if #walkWaypoints > 0 and currentWPIndex <= #walkWaypoints then
                                         local wp = walkWaypoints[currentWPIndex]
-                                        
                                         if wp.Action == Enum.PathWaypointAction.Jump then
                                             humanoid.Jump = true
                                         end
-                                        
                                         humanoid:MoveTo(wp.Position)
-                                        
+                                        local flatRoot = Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z)
+                                        local flatWP = Vector3.new(wp.Position.X, 0, wp.Position.Z)
+                                        if (flatRoot - flatWP).Magnitude <= 4 then
+                                            currentWPIndex = currentWPIndex + 1
+                                        end
+                                    else
+                                        humanoid:MoveTo(petRoot.Position)
+                                    end
+                                else
+                                    humanoid:MoveTo(petRoot.Position)
+                                end
                                         -- Flat 2D distance calculation to prevent getting stuck orbiting waypoints
                                         local flatRoot = Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z)
                                         local flatWP = Vector3.new(wp.Position.X, 0, wp.Position.Z)
