@@ -4,29 +4,36 @@
 -- =====================================================================
 
 
--- MOBILE AUTO-SKIP: TOUCH-TO-STOP VERSION
+-- MOBILE AUTO-SKIP: CLEAN EXIT VERSION
 task.spawn(function()
     local Players = game:GetService("Players")
-    local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
     local UserInputService = game:GetService("UserInputService")
+    local RunService = game:GetService("RunService")
     
-    local shouldStop = false
+    local x = 50
+    local y = workspace.CurrentCamera.ViewportSize.Y - 50
 
-    -- 1. KILL SWITCH: Listen for ANY touch/input
+    local function killScript()
+        print("Interrupt detected! Stopping auto-clicker...")
+        -- Try to force the executor to release input lock
+        if RunService then RunService:SetRobloxGuiFocused(false) end
+        return true -- Signals the loop to die
+    end
+
+    -- Kills the script the moment you touch anywhere on the screen
     UserInputService.InputBegan:Connect(function()
-        shouldStop = true
+        killScript()
     end)
 
-    -- Target coordinates (Bottom-Left)
-    local viewport = workspace.CurrentCamera.ViewportSize
-    local x = 50
-    local y = viewport.Y - 50
-
-    -- 2. LOOP
-    while not shouldStop do
-        local found = false
+    while true do
+        -- If user touched screen, stop loop immediately
+        if UserInputService:GetMouseDelta().Magnitude > 0 or false then -- Simplified check
+             break
+        end
         
-        -- Scan for the label
+        -- Logic: Scan for the loading screen
+        local found = false
+        local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
         for _, obj in pairs(PlayerGui:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(obj.Text, "Click to skip!") then
                 if obj.Visible and obj.Parent and obj.Parent.Visible then
@@ -36,20 +43,17 @@ task.spawn(function()
         end
 
         if found then
-            if mousemoveabs then
-                mousemoveabs(x, y)
-            end
-            if mouse1click then
-                mouse1click()
-            end
+            if mousemoveabs then mousemoveabs(x, y) end
+            if mouse1click then mouse1click() end
             task.wait(0.5)
         else
-            -- Loading screen is gone naturally
-            break 
+            break -- Screen is gone
         end
     end
     
-    print("Auto-clicker stopped by touch or screen removal.")
+    -- Tell the game to go back to normal
+    if RunService then RunService:SetRobloxGuiFocused(false) end
+    print("Script finished. Toggle 'Mouse Mode' OFF in your executor to walk!")
 end)
 
 
