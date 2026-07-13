@@ -4,22 +4,22 @@
 -- =====================================================================
 
 
--- RAW CURSOR AUTO-CLICKER: MOBILE EMULATION VERSION
+-- FINAL AUTO-SKIP: BOTTOM-LEFT (SAFE ZONE)
 task.spawn(function()
     local Players = game:GetService("Players")
     local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
     
-    -- Target coordinates (Change these if the skip button is somewhere else)
-    local x = 500
-    local y = 500
+    -- Bottom-Left Coordinates
+    local viewport = workspace.CurrentCamera.ViewportSize
+    local x = 50
+    local y = viewport.Y - 50 -- This calculates the bottom edge
 
     while true do
         local found = false
         
-        -- Scan for the label
+        -- Scan for the "Click to skip!" text
         for _, obj in pairs(PlayerGui:GetDescendants()) do
             if obj:IsA("TextLabel") and string.find(obj.Text, "Click to skip!") then
-                -- Check if it is visible
                 if obj.Visible and obj.Parent and obj.Parent.Visible then
                     found = true
                 end
@@ -27,7 +27,7 @@ task.spawn(function()
         end
 
         if found then
-            -- Move cursor and click
+            -- Move visual cursor to bottom-left and click
             if mousemoveabs then
                 mousemoveabs(x, y)
             end
@@ -36,11 +36,12 @@ task.spawn(function()
             end
             task.wait(0.5)
         else
-            -- Break the loop immediately when text is gone
+            -- Loading screen is gone, script stops completely
             break 
         end
     end
 end)
+
 
 
 -- Global Configuration Matrix
