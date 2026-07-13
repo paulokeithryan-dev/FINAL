@@ -157,22 +157,22 @@ local function smoothFlyTo(targetCFrame, speedOverride)
 end
 
 local function executeDualActionStrike(shovel)
+    -- Global screen center coordinate simulation
     local camera = workspace.CurrentCamera
     if camera then
-        local safeX = 20
-        local safeY = 220 
-        VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, true, game, 0)
-        VirtualInputManager:SendMouseButtonEvent(safeX, safeY, 0, false, game, 0)
+        local screenCenter = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+        
+        -- Simulate genuine MouseButton1 click at center screen
+        VirtualInputManager:SendMouseButtonEvent(screenCenter.X, screenCenter.Y, 0, true, game, 0)
+        task.wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(screenCenter.X, screenCenter.Y, 0, false, game, 0)
     end
     
+    -- Fallback: If held tool is valid, trigger its internal event once as a secondary layer
     if shovel then
-        shovel:Activate() 
-        for _, obj in ipairs(shovel:GetDescendants()) do
-            if obj:IsA("RemoteEvent") or obj:IsA("UnreliableRemoteEvent") then
-                obj:FireServer() 
-                obj:FireServer() 
-            end
-        end
+        pcall(function()
+            shovel:Activate()
+        end)
     end
 end
 
@@ -893,9 +893,9 @@ end)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "GAGHUB",
+    Name = "Premium UI Engine - VERSION 6.2 (RECON)",
     LoadingTitle = "Pet Hunter Engine",
-    LoadingSubtitle = "by Kisso",
+    LoadingSubtitle = "by Recon",
     ConfigurationSaving = {
         Enabled = false, 
     },
