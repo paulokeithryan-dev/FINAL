@@ -5,31 +5,36 @@
 
 
 
--- RELIABLE AUTO-SKIP (STOPS WHEN UI IS GONE)
+-- AUTO-SKIP USING PHYSICAL CURSOR
 task.spawn(function()
-    local VirtualInputManager = game:GetService("VirtualInputManager")
     local Players = game:GetService("Players")
     local PlayerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+    
+    -- The UI object we are monitoring to know when to stop
+    -- Make sure this name matches your Explorer (e.g., 'LoadingScreen')
+    local loadingGui = PlayerGui:WaitForChild("LoadingScreen", 10)
 
-    -- 1. WAIT for the loading screen to appear
-    -- Change "LoadingScreen" to the exact name seen in your Explorer
-    local loadingGui = PlayerGui:WaitForChild("LoadingScreen", 10) 
-
-    if loadingGui then
-        -- 2. CLICK LOOP: Only runs while the UI is still in the PlayerGui
-        while loadingGui and loadingGui.Parent == PlayerGui do
-            local viewport = workspace.CurrentCamera.ViewportSize
-            local x = 50
-            local y = viewport.Y - 50
-            
-            VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-            
-            task.wait(0.5) -- Adjust this delay if it's clicking too fast
+    while loadingGui and loadingGui.Parent == PlayerGui do
+        -- 1. Define Bottom-Left coordinates
+        local viewport = workspace.CurrentCamera.ViewportSize
+        local targetX = 50
+        local targetY = viewport.Y - 50
+        
+        -- 2. Move physical cursor and click
+        if mousemoveabs then
+            mousemoveabs(targetX, targetY)
+            task.wait(0.1)
+            mouse1click()
+        else
+            -- Fallback if your executor doesn't support mousemoveabs
+            -- It will at least try to click the location
+            mouse1click()
         end
         
-        print("Loading screen removed. Auto-clicker stopped.")
+        task.wait(1) -- Click interval
     end
+    
+    print("Loading screen gone, auto-cursor stopped.")
 end)
 
 -- Global Configuration Matrix
